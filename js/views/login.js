@@ -38,8 +38,8 @@ export function LoginView({ backend, describeError, onDemo }) {
 
   return html`<div class="login">
     <form class="login__card" onSubmit=${submit}>
-      <${Mark} size=${56} cls="login__mark" />
-      <h1 class="login__title">Sign in</h1>
+      <${Mark} size=${60} cls="login__mark" />
+      <h1 class="login__title">Welcome back.<br /><strong>Sign in.</strong></h1>
       <p class="login__sub">Your dashboard syncs between your phone and your computer.</p>
       <label class="field">
         <span class="field__label">Email</span>
@@ -63,8 +63,8 @@ export function LoginView({ backend, describeError, onDemo }) {
 export function SetupView({ onDemo }) {
   return html`<div class="login">
     <div class="login__card">
-      <${Mark} size=${56} cls="login__mark" />
-      <h1 class="login__title">Connect your database</h1>
+      <${Mark} size=${60} cls="login__mark" />
+      <h1 class="login__title">One step left.<br /><strong>Connect your database.</strong></h1>
       <p class="login__sub">Add your Firebase keys to config.js so your phone and computer share the same data. The README walks through it in about ten minutes, free and without a card.</p>
       <button class="btn btn--primary btn--block" style="min-height:46px" onClick=${onDemo}>Try the demo first</button>
       <p class="faint" style="margin-top:14px;font-size:13px">The demo runs with sample data and saves nothing.</p>

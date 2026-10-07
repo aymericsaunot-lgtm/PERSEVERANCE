@@ -1,5 +1,5 @@
 // Offline cache. Bump VERSION whenever you change any file, so installed apps update.
-const VERSION = '2026.10.06';
+const VERSION = '2026.10.07';
 const CACHE = `dashboard-${VERSION}`;
 
 const SHELL = [
@@ -10,6 +10,7 @@ const SHELL = [
   './css/app.css',
   './vendor/preact.js',
   './vendor/firebase.js',
+  './vendor/anthropic.js',
   './js/main.js',
   './js/store.js',
   './js/ui.js',
@@ -18,19 +19,26 @@ const SHELL = [
   './js/backend-firebase.js',
   './js/demo-data.js',
   './js/lib/dates.js',
+  './js/lib/jarvis.js',
   './js/lib/papers.js',
   './js/lib/surf.js',
   './js/lib/text.js',
+  './js/lib/xp.js',
+  './js/views/jarvis.js',
   './js/views/life.js',
   './js/views/login.js',
   './js/views/papers.js',
   './js/views/phd.js',
+  './js/views/progress.js',
   './js/views/settings.js',
   './js/views/tasks.js',
   './js/views/today.js',
-  './fonts/plex-sans-latin.woff2',
-  './fonts/plex-sans-latin-ext.woff2',
-  './fonts/plex-sans-greek.woff2',
+  './fonts/manrope-latin.woff2',
+  './fonts/manrope-latin-ext.woff2',
+  './fonts/manrope-greek.woff2',
+  './fonts/doto-latin.woff2',
+  './fonts/dmmono-400-latin.woff2',
+  './fonts/dmmono-500-latin.woff2',
   './fonts/stix-latin-400.woff2',
   './fonts/stix-latin-400-italic.woff2',
   './fonts/stix-latin-500.woff2',
@@ -66,7 +74,7 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // Firebase, Crossref, arXiv and Open-Meteo go straight to the network.
+  // Firebase, Anthropic, Crossref, arXiv and Open-Meteo go straight to the network.
   if (url.origin !== self.location.origin) return;
 
   if (req.mode === 'navigate') {

@@ -1,20 +1,21 @@
 {
   "name": "Dashboard",
   "short_name": "Dashboard",
-  "description": "Tasks, papers, arXiv watch, PhD planning, surf and habits.",
+  "description": "Tasks, papers, arXiv watch, PhD planning, surf and habits, with Jarvis and a level system.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#F3F4F6",
-  "theme_color": "#F3F4F6",
+  "background_color": "#070708",
+  "theme_color": "#070708",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
+    { "name": "Jarvis", "url": "./#/jarvis" },
     { "name": "Tasks", "url": "./#/tasks" },
     { "name": "Papers", "url": "./#/papers" },
-    { "name": "arXiv watch", "url": "./#/papers/watch" }
+    { "name": "Progress", "url": "./#/progress" }
   ]
 }

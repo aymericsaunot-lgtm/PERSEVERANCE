@@ -1,5 +1,5 @@
 // Shared interface pieces: icons, rich text, sheets, chips, toasts.
-import { html, useEffect, useRef, useState } from '../vendor/preact.js';
+import { html, useEffect, useLayoutEffect, useRef, useState } from '../vendor/preact.js';
 import { latexToSegments, chemSegments, sameTag } from './lib/text.js';
 import { parseISO } from './lib/dates.js';
 
@@ -84,6 +84,21 @@ export function Mark({ size = 28, cls = '' }) {
 // Jarvis's orb. `live` makes it breathe while Jarvis is thinking or speaking.
 export function Orb({ size = 40, live = false, cls = '' }) {
   return html`<span class=${'orb' + (live ? ' orb--live' : '') + (cls ? ' ' + cls : '')} style=${`--s:${size}px`} aria-hidden="true"></span>`;
+}
+
+// Width of an element in CSS pixels, kept current, for charts drawn in real pixels.
+export function useWidth(initial = 600, min = 200) {
+  const ref = useRef(null);
+  const [w, setW] = useState(initial);
+  useLayoutEffect(() => {
+    if (!ref.current) return undefined;
+    const update = () => ref.current && setW(Math.max(min, Math.round(ref.current.getBoundingClientRect().width)));
+    update();
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    if (ro) ro.observe(ref.current);
+    return () => ro && ro.disconnect();
+  }, []);
+  return [ref, w];
 }
 
 // Page header: a small mono line above a large title.

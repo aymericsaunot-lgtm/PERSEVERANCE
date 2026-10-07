@@ -1,7 +1,8 @@
-import { html, useState, useRef, useLayoutEffect } from '../../vendor/preact.js';
+import { html, useState } from '../../vendor/preact.js';
 import { actions } from '../store.js';
-import { Icon, Check, Chem, Section, Sheet, Field, Empty, DateChip, DangerButton, toast } from '../ui.js';
+import { Icon, Check, Chem, Section, Sheet, Field, Empty, DateChip, DangerButton, PageHead, toast, useWidth } from '../ui.js';
 import { todayISO, addDays, daysBetween, relDays, fmtRange, fmtShort, fmtDate, parseISO, isoOf } from '../lib/dates.js';
+import { XP } from '../lib/xp.js';
 
 export function beamtimeState(b, today = todayISO()) {
   const end = b.end || b.start;
@@ -34,23 +35,9 @@ export function upcoming(data, today = todayISO()) {
   return items.sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function useWidth() {
-  const ref = useRef(null);
-  const [w, setW] = useState(600);
-  useLayoutEffect(() => {
-    if (!ref.current) return undefined;
-    const update = () => ref.current && setW(Math.max(240, Math.round(ref.current.getBoundingClientRect().width)));
-    update();
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
-    if (ro) ro.observe(ref.current);
-    return () => ro && ro.disconnect();
-  }, []);
-  return [ref, w];
-}
-
 // The next eight weeks on one axis: beamtimes as bands, deadlines as points, today as a line.
 export function Horizon({ data }) {
-  const [ref, W] = useWidth();
+  const [ref, W] = useWidth(600, 240);
   const today = todayISO();
   const R0 = -7;
   const R1 = W < 480 ? 42 : 63;
@@ -186,8 +173,19 @@ function ChapterSheet({ item, chapters, onClose }) {
   const save = () => {
     if (!f.title.trim()) { toast('Give the chapter a title'); return; }
     const data = { ...f, title: f.title.trim(), progress: Math.max(0, Math.min(100, Number(f.progress) || 0)) };
+    // Progress changes are logged per day, so writing earns XP on the day it happens. A new
+    // chapter's starting progress is a baseline, not a gain.
+    const delta = isNew ? 0 : data.progress - (Number(item.progress) || 0);
+    if (delta) {
+      const day = todayISO();
+      const gains = { ...(item.gains || {}) };
+      gains[day] = (Number(gains[day]) || 0) + delta;
+      if (!gains[day]) delete gains[day];
+      data.gains = gains;
+    }
     if (isNew) actions.add('chapters', { ...data, order: (sorted.length ? sorted[sorted.length - 1].order || sorted.length : 0) + 1 });
     else actions.update('chapters', item.id, data);
+    if (delta > 0) toast(`${data.title} at ${data.progress}%`, { xp: Math.round(delta * XP.thesisPoint) });
     onClose();
   };
   return html`<${Sheet} title=${isNew ? 'New chapter' : 'Chapter'} onClose=${onClose} actions=${html`
@@ -249,7 +247,7 @@ export function PhdView({ state }) {
     const n = daysBetween(today, d.date);
     const cls = d.done ? 'faint' : n < 0 ? 'due due--late' : n <= 7 ? 'due due--soon' : 'due';
     return html`<div key=${d.id} class=${'row row--button row--indent' + (d.done ? ' row--done' : '')} role="button" tabindex="0" onClick=${() => setSheet({ type: 'deadline', item: d })}>
-      <${Check} checked=${!!d.done} label=${d.done ? 'Mark as open' : 'Mark as submitted'} onChange=${(v) => { actions.update('deadlines', d.id, { done: v }); if (v) toast('Marked as submitted'); }} />
+      <${Check} checked=${!!d.done} label=${d.done ? 'Mark as open' : 'Mark as submitted'} onChange=${(v) => { actions.update('deadlines', d.id, { done: v, doneAt: v ? Date.now() : null }); if (v) toast('Marked as submitted', { xp: XP.deadline }); }} />
       <div class="row__main">
         <div class="row__title">${d.title}</div>
         <div class="row__sub">${[d.facility, KIND_LABEL[d.kind] || 'Deadline', fmtDate(d.date)].filter(Boolean).join(', ')}${d.url ? html` <a href=${d.url} target="_blank" rel="noopener" onClick=${(e) => e.stopPropagation()}>Open link</a>` : ''}</div>
@@ -258,8 +256,21 @@ export function PhdView({ state }) {
     </div>`;
   };
 
+  const next = upcoming(state.data, today)[0];
+  const nextN = next ? daysBetween(today, next.date) : null;
   return html`<div>
-    <h1 class="page-title">PhD</h1>
+    <${PageHead} over=${`Thesis ${pct}%${target ? ` · submission ${relDays(target, today).text}` : ''}`} title="PhD" />
+    ${next && html`<div class="group aura milestone">
+      <div>
+        <div class="milestone__num num">${nextN === 0 ? 'NOW' : nextN}</div>
+        <div class="milestone__unit">${nextN === 0 ? (next.kind === 'beamtime' ? next.side : 'today') : nextN === 1 ? 'day to go' : 'days to go'}</div>
+      </div>
+      <div class="milestone__what">
+        <span class="overline">${next.kind === 'beamtime' ? 'Next beamtime' : next.kind === 'thesis' ? 'Submission' : 'Next deadline'}</span>
+        <div class="milestone__title">${next.title}</div>
+        <div class="row__sub">${next.sub || fmtDate(next.date)}</div>
+      </div>
+    </div>`}
     <div class="grid-2">
       <div class="stack">
         <${Section} title="Beamtimes" action=${html`<button class="btn btn--quiet btn--sm" onClick=${() => setSheet({ type: 'beamtime', item: {} })}><${Icon} name="plus" size="xs" />Add</button>`}>

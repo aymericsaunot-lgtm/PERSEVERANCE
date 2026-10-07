@@ -1,6 +1,7 @@
 import { html, useState, useMemo, useRef } from '../../vendor/preact.js';
 import { actions } from '../store.js';
-import { Icon, Rich, Chem, Section, Segmented, Sheet, Field, Empty, TagEditor, DangerButton, toast, downloadFile, copyText } from '../ui.js';
+import { Icon, Rich, Chem, Section, Segmented, Sheet, Field, Empty, TagEditor, DangerButton, PageHead, toast, downloadFile, copyText } from '../ui.js';
+import { XP } from '../lib/xp.js';
 import { lookupPaper, parseIdentifier, authorShort, authorsLong, journalLine, paperLinks, toBibtex, splitName, yearFromArxivId, bibKey, isArxivId } from '../lib/papers.js';
 import { normalize, sameTag, matchesKeyword } from '../lib/text.js';
 import { startOfWeek, startOfMonth, startOfYear, fmtAgo, fmtLong, todayISO, DAY } from '../lib/dates.js';
@@ -18,7 +19,7 @@ export function setPaperStatus(p, status) {
   if (status === 'reading' && !p.startedAt) patch.startedAt = Date.now();
   patch.readAt = status === 'read' ? Date.now() : null;
   actions.update('papers', p.id, patch);
-  if (status === 'read') toast('Marked as read');
+  if (status === 'read') toast('Marked as read', { xp: XP.paper });
 }
 
 export function readingStats(papers, now = new Date()) {
@@ -121,7 +122,7 @@ function AddPaper({ papers, settings, onOpen }) {
       readAt: status === 'read' ? now : null,
       notes: '',
     });
-    toast(status === 'read' ? 'Added and counted as read' : 'Added to your library');
+    toast(status === 'read' ? 'Added and counted as read' : 'Added to your library', status === 'read' ? { xp: XP.paper } : {});
     setQ('');
     setSt({ phase: 'idle' });
   };
@@ -430,8 +431,9 @@ export function PapersView({ state, sub, go }) {
   const tab = sub === 'watch' ? 'watch' : 'library';
   const newCount = state.data.arxiv.filter((x) => x.status === 'new').length;
   const current = open && !open.isNew ? state.data.papers.find((p) => p.id === open.id) || open : open;
+  const s = readingStats(state.data.papers);
   return html`<div>
-    <h1 class="page-title">Papers</h1>
+    <${PageHead} over=${`${s.week} read this week · ${s.toread} to read`} title="Papers" />
     <div class="toolbar">
       <${Segmented} label="Papers" value=${tab} onChange=${(t) => go(t === 'watch' ? 'papers/watch' : 'papers')} items=${[
         { id: 'library', label: 'Library', count: state.data.papers.length },

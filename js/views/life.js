@@ -1,8 +1,11 @@
 import { html, useState, useEffect, useMemo } from '../../vendor/preact.js';
 import { actions, getState } from '../store.js';
-import { Icon, Section, Sheet, Field, Empty, DatePick, DangerButton, toast } from '../ui.js';
+import { Icon, Section, Sheet, Field, Empty, DatePick, DangerButton, PageHead, toast, useWidth } from '../ui.js';
 import { loadForecast, summarize, compass, SCORE_LABEL } from '../lib/surf.js';
 import { todayISO, addDays, fmtDate, fmtAgo, startOfWeek, isoOf, weekdayShort, daysBetween } from '../lib/dates.js';
+import { streak, sportXP, XP } from '../lib/xp.js';
+
+export { streak };
 
 const inflight = new Map();
 
@@ -64,6 +67,76 @@ function TideCurve({ tide }) {
   </svg>`;
 }
 
+const skyAt = (hour) => (hour < 6 || hour >= 21 ? 'night' : hour < 9 ? 'dawn' : hour < 17 ? 'day' : 'dusk');
+
+// Today's swell as one white line over a sky that follows the hour, flag on the best session.
+function DayChart({ summary }) {
+  const [ref, W] = useWidth(300, 160);
+  const H = 84;
+  const hours = summary.hours.filter((h) => h.height != null);
+  if (hours.length < 3) return null;
+  // Scaled to the day's own range so a 1.5 to 1.8 m day still shows its shape.
+  const hs = hours.map((h) => h.height);
+  const lo = Math.max(0, Math.min(...hs) - 0.35);
+  const hi = Math.max(...hs) + 0.2;
+  const X = (t) => ((t - summary.dayStart) / 86400) * W;
+  const Y = (v) => 6 + (1 - Math.max(0, Math.min(1, (v - lo) / (hi - lo)))) * (H - 10);
+  const line = hours.map((h, i) => `${i ? 'L' : 'M'}${X(h.t).toFixed(1)},${Y(h.height).toFixed(1)}`).join(' ');
+  const area = `${line} L${X(hours[hours.length - 1].t).toFixed(1)},${H} L${X(hours[0].t).toFixed(1)},${H} Z`;
+  const best = summary.days[0] && summary.days[0].best;
+  const bx = best ? X(best.t) : 0;
+  const by = best ? Y(best.height) : 0;
+  const nx = Math.max(0, Math.min(W, summary.nowFrac * W));
+  const ny = summary.now.height != null ? Y(summary.now.height) : null;
+  const labelEnd = bx > W - 76;
+  return html`<div class="surf-hero__chart" ref=${ref}>
+    <svg viewBox=${`0 0 ${W} ${H}`} width=${W} height=${H} role="img" aria-label=${`Swell today, ${best ? `best around ${summary.days[0].bestLabel}` : 'no daylight session left'}`}>
+      <defs>
+        <linearGradient id="swell-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fff" stop-opacity="0.22" />
+          <stop offset="1" stop-color="#fff" stop-opacity="0" />
+        </linearGradient>
+      </defs>
+      <path d=${area} fill="url(#swell-fill)" />
+      <path d=${line} fill="none" stroke="rgba(255,255,255,0.92)" stroke-width="1.6" stroke-linejoin="round" />
+      ${best && html`<g>
+        <line x1=${bx} x2=${bx} y1=${by} y2=${H} stroke="rgba(255,255,255,0.55)" />
+        <line x1=${bx} x2=${bx} y1=${by - 24} y2=${by} stroke="#fff" stroke-width="1.2" />
+        <path d=${`M${bx},${by - 24} l9,3.5 l-9,3.5 Z`} fill="#fff" />
+        <circle cx=${bx} cy=${by} r="3.2" fill="#fff" />
+        <text class="surf-hero__flag" x=${labelEnd ? bx - 6 : bx + 13} y=${by - 15} text-anchor=${labelEnd ? 'end' : 'start'}>BEST ${summary.days[0].bestLabel}</text>
+      </g>`}
+      ${ny != null && html`<circle cx=${nx} cy=${ny} r="4" fill="#fff" stroke="rgba(255,255,255,0.35)" stroke-width="6" />`}
+    </svg>
+    <div class="surf-hero__axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+  </div>`;
+}
+
+export function SurfHero({ settings, link = false }) {
+  const spot = settings.surf;
+  const { summary, loading } = useSurf(spot);
+  const sky = `surf-hero surf-hero--${skyAt(new Date().getHours())}${link ? ' tile-btn' : ''}`;
+  const Tag = link ? 'a' : 'div';
+  if (!summary) {
+    return html`<${Tag} class=${sky} href=${link ? '#/life' : undefined}>
+      <div class="surf-hero__label">Surf · ${spot.name || 'your spot'}</div>
+      <div class="surf-hero__sub" style="margin-top:auto">${loading ? 'Loading the forecast' : 'Forecast unavailable right now'}</div>
+    </${Tag}>`;
+  }
+  const n = summary.now;
+  return html`<${Tag} class=${sky} href=${link ? '#/life' : undefined} aria-label=${link ? `Surf at ${spot.name}: ${fmtM(n.height)} metres, ${SCORE_LABEL[n.score]}. Open Life` : undefined}>
+    <div class="surf-hero__top">
+      <div>
+        <div class="surf-hero__label">Surf · ${spot.name || 'your spot'}</div>
+        <div class="surf-hero__big">${fmtM(n.height)}<span class="surf-hero__unit">m</span></div>
+        <div class="surf-hero__sub">${fmtS(n.period)} s from ${compass(n.dir)}${n.wind != null ? ` · wind ${Math.round(n.wind)} km/h${n.rel ? ` ${n.rel}` : ''}` : ''}</div>
+      </div>
+      <span class="surf-hero__pill">${SCORE_LABEL[n.score]}</span>
+    </div>
+    <${DayChart} summary=${summary} />
+  </${Tag}>`;
+}
+
 export function SurfCard({ settings, onSettings }) {
   const spot = settings.surf;
   const { loading, summary, error, fc, refresh } = useSurf(spot);
@@ -75,14 +148,11 @@ export function SurfCard({ settings, onSettings }) {
     </${Section}>`;
   }
   const n = summary.now;
+  const nextTide = summary.tide.extremes.find((e) => e.t * 1000 > Date.now());
   return html`<${Section} title=${`Surf, ${spot.name || 'your spot'}`} action=${head}>
-    <div class="group">
+    <${SurfHero} settings=${settings} />
+    <div class="group" style="margin-top:12px">
       <div class="surf-now">
-        <div class="stat">
-          <div class="stat__value">${fmtM(n.height)}<span class="countdown__unit">m</span></div>
-          <div class="stat__label">Swell, ${fmtS(n.period)} s</div>
-          <div class="surf-now__dir"><${DirArrow} deg=${n.dir} />from ${compass(n.dir)}</div>
-        </div>
         <div class="stat">
           <div class="stat__value">${n.wind == null ? '-' : Math.round(n.wind)}<span class="countdown__unit">km/h</span></div>
           <div class="stat__label">Wind${n.rel ? `, ${n.rel}` : ''}</div>
@@ -91,14 +161,19 @@ export function SurfCard({ settings, onSettings }) {
         <div class="stat">
           <div class="stat__value">${n.sst == null ? '-' : n.sst.toFixed(1)}<span class="countdown__unit">°C</span></div>
           <div class="stat__label">Water</div>
+          <div class="surf-now__dir"><${DirArrow} deg=${n.dir} />swell from ${compass(n.dir)}</div>
+        </div>
+        <div class="stat">
+          <div class="stat__value">${nextTide ? nextTide.label : '-'}</div>
+          <div class="stat__label">${nextTide ? `${nextTide.type} tide` : 'Tide'}</div>
           <div class="surf-now__dir">${SCORE_LABEL[n.score]} now</div>
         </div>
       </div>
-      ${summary.tide.points.length > 2 && html`<div class="tide">
+      ${summary.tide.points.length > 2 && html`<div class="tide" style="border-top:1px solid var(--line);padding-top:14px">
         <${TideCurve} tide=${summary.tide} />
-        <div class="tide__marks">${summary.tide.extremes.map((e) => html`<span key=${e.t}>${e.type} tide ${e.label}</span>`)}</div>
+        <div class="tide__marks">${summary.tide.extremes.map((e) => html`<span key=${e.t}>${e.type} ${e.label}</span>`)}</div>
       </div>`}
-      <div class="surf-days">
+      <div class="surf-days" style="border-top:1px solid var(--line)">
         ${summary.days.slice(0, 6).map((d) => html`<div key=${d.date} class="surf-day">
           <div class="surf-day__name">${d.name}</div>
           <div class="surf-day__h">${fmtM(d.best ? d.best.height : d.maxHeight)} m</div>
@@ -110,30 +185,6 @@ export function SurfCard({ settings, onSettings }) {
       <p class="surf-note" style="padding-top:12px">${fc && fc.sample ? 'Sample forecast for the preview. ' : ''}Rough guide from swell height, period and wind direction for a beach facing ${compass(Number(spot.facing))}. Data from Open-Meteo, ${fmtAgo(fc && fc.cachedAt)}.${fc && fc.stale ? ' Offline copy.' : ''} ${onSettings ? html`<button class="link-btn" style="font-size:12px" onClick=${onSettings}>Change spot</button>` : ''}</p>
     </div>
   </${Section}>`;
-}
-
-export function SurfMini({ settings, go }) {
-  const { summary, loading } = useSurf(settings.surf);
-  if (!summary) return html`<div class="group"><${Empty}>${loading ? 'Loading the forecast' : 'Forecast unavailable right now'}</${Empty}></div>`;
-  const n = summary.now;
-  const today = summary.days[0];
-  const nextTide = summary.tide.extremes.find((e) => e.t * 1000 > Date.now());
-  return html`<div class="group">
-    <button class="row row--button" onClick=${() => go('life')}>
-      <span style="color:var(--accent);display:flex"><${Icon} name="life" /></span>
-      <div class="row__main">
-        <div class="row__title">${fmtM(n.height)} m at ${fmtS(n.period)} s from ${compass(n.dir)}</div>
-        <div class="row__sub">Wind ${n.wind == null ? '-' : Math.round(n.wind)} km/h${n.rel ? ` ${n.rel}` : ''}${n.sst != null ? `, water ${n.sst.toFixed(0)}°C` : ''}</div>
-      </div>
-      <span class=${'pill' + (n.score >= 3 ? ' pill--accent' : '')}>${SCORE_LABEL[n.score]}</span>
-    </button>
-    ${(today && today.best) || nextTide ? html`<div class="row">
-      <span class="faint" style="display:flex"><${Icon} name="calendar" size="sm" /></span>
-      <div class="row__main row__sub" style="margin:0">
-        ${today && today.best ? `Best today around ${today.bestLabel}, ${SCORE_LABEL[today.best.score].toLowerCase()}` : 'No more daylight sessions today'}${nextTide ? `. ${nextTide.type} tide at ${nextTide.label}` : ''}
-      </div>
-    </div>` : null}
-  </div>`;
 }
 
 // Sport log
@@ -172,7 +223,7 @@ export function SportLog({ sessions, settings, surfNow }) {
       ? `${surfNow.height != null ? surfNow.height.toFixed(1) : '-'} m, ${surfNow.period != null ? Math.round(surfNow.period) : '-'} s from ${compass(surfNow.dir)}, wind ${surfNow.wind != null ? Math.round(surfNow.wind) : '-'} km/h ${surfNow.rel || ''}`.trim()
       : '';
     actions.add('sessions', { type, minutes: m, date, note: note.trim(), conditions });
-    toast(`${type} logged`);
+    toast(`${type} logged`, { xp: sportXP(m) });
     setNote('');
     setDate(today);
   };
@@ -209,13 +260,15 @@ export function SportLog({ sessions, settings, surfNow }) {
   </${Section}>`;
 }
 
-// Habits
-export function streak(days, today = todayISO()) {
-  const set = new Set(days || []);
-  let d = set.has(today) ? today : addDays(today, -1);
-  let n = 0;
-  while (set.has(d)) { n++; d = addDays(d, -1); }
-  return n;
+// Habits. Ticking today shows the XP it earns, and the bonus when it completes the set.
+function tickHabit(habit, date, habits) {
+  const on = !(habit.days || []).includes(date);
+  actions.toggleHabitDay(habit, date);
+  if (!on || date !== todayISO()) return;
+  const active = habits.filter((h) => !h.archived);
+  const rest = active.filter((h) => h.id !== habit.id).every((h) => (h.days || []).includes(date));
+  if (active.length >= 2 && rest) toast('Every habit done today', { xp: XP.habit + XP.allHabits, ms: 2600 });
+  else toast(habit.name, { xp: XP.habit, ms: 1800 });
 }
 
 function HabitSheet({ habit, onClose }) {
@@ -263,7 +316,7 @@ export function HabitList({ habits }) {
           <div class="week-dots">
             ${days.map((d) => {
               const on = (h.days || []).includes(d);
-              return html`<button key=${d} class=${'week-dot' + (d === today ? ' week-dot--today' : '')} aria-pressed=${on ? 'true' : 'false'} aria-label=${`${h.name}, ${fmtDate(d)}`} onClick=${() => actions.toggleHabitDay(h, d)}>
+              return html`<button key=${d} class=${'week-dot' + (d === today ? ' week-dot--today' : '')} aria-pressed=${on ? 'true' : 'false'} aria-label=${`${h.name}, ${fmtDate(d)}`} onClick=${() => tickHabit(h, d, habits)}>
                 ${weekdayShort(d).slice(0, 1)}<i></i>
               </button>`;
             })}
@@ -288,7 +341,7 @@ export function HabitChips({ habits }) {
     ${list.map((h) => {
       const on = (h.days || []).includes(today);
       const s = streak(h.days, today);
-      return html`<button key=${h.id} class="habit-chip" aria-pressed=${on ? 'true' : 'false'} onClick=${() => actions.toggleHabitDay(h, today)}>
+      return html`<button key=${h.id} class="habit-chip" aria-pressed=${on ? 'true' : 'false'} onClick=${() => tickHabit(h, today, habits)}>
         <span class="check" aria-checked=${on ? 'true' : 'false'}><${Icon} name="check" /></span>
         ${h.name}${s > 1 && html`<span class="habit-chip__streak" aria-label=${`${s}-day streak`}>${s} days</span>`}
       </button>`;
@@ -299,8 +352,13 @@ export function HabitChips({ habits }) {
 export function LifeView({ state, go }) {
   const { sessions, habits, settings } = state.data;
   const { summary } = useSurf(settings.surf);
+  const today = todayISO();
+  const active = habits.filter((h) => !h.archived);
+  const doneToday = active.filter((h) => (h.days || []).includes(today)).length;
+  const wk = isoOf(startOfWeek());
+  const weekSessions = sessions.filter((s) => s.date >= wk).length;
   return html`<div>
-    <h1 class="page-title">Life</h1>
+    <${PageHead} over=${`${doneToday}/${active.length} habits today · ${weekSessions} ${weekSessions === 1 ? 'session' : 'sessions'} this week`} title="Life" />
     <div class="grid-2">
       <${SurfCard} settings=${settings} onSettings=${() => go('settings')} />
       <div class="stack">

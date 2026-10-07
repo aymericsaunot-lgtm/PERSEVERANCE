@@ -2,7 +2,7 @@
 // sport, thesis progress), so there is nothing extra to track and old data counts too.
 // Finished tasks only stay synced for 30 days, so days older than a week are frozen
 // into meta/progress and read back from there.
-import { todayISO, addDays, isoOf, startOfWeek } from './dates.js';
+import { todayISO, addDays, isoOf, startOfWeek, parseISO } from './dates.js';
 
 export const ATTRS = [
   { id: 'work', label: 'Work', from: 'Tasks, deadlines, beamtimes and thesis progress' },
@@ -127,6 +127,7 @@ function rowsByDay(events) {
 }
 
 // The patch that freezes finished days (older than a week) into meta/progress, or null.
+// `days` is left out when empty: a merge with an empty map would replace the stored one.
 export function archivePatch(data, today = todayISO()) {
   const doc = data.progress || {};
   const target = addDays(today, -7);
@@ -137,7 +138,7 @@ export function archivePatch(data, today = todayISO()) {
     if (day > target || (doc.through && day <= doc.through) || known[day]) continue;
     days[day] = row;
   }
-  return { through: target, days };
+  return Object.keys(days).length ? { through: target, days } : { through: target };
 }
 
 function computeProgress(data, today) {
@@ -162,7 +163,7 @@ function computeProgress(data, today) {
   const goal = Number(data.settings.xpGoal) || 100;
   const dayXP = (d) => Math.max(0, sum(days.get(d)));
 
-  const weekStart = isoOf(startOfWeek(new Date()));
+  const weekStart = isoOf(startOfWeek(parseISO(today)));
   const week = [];
   const weekAttr = zero();
   for (let i = 0; i < 7; i++) {

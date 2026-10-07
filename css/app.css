@@ -522,6 +522,8 @@ code { font-family: var(--font-mono); font-size: 0.9em; background: var(--soft-2
   .bento__col--main { flex-grow: 1.3; }
 }
 .duo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+/* Tiles in a grid are spaced by the grid gap, not by the stacking margin. */
+.duo > .group + .group, .attr-grid > .group + .group { margin-top: 0; }
 
 /* Rows */
 .row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 12px 18px; position: relative; }
@@ -803,14 +805,21 @@ a.chip:hover { text-decoration: none; }
 .habit-chip[aria-pressed="true"] { border-color: transparent; background: var(--accent-soft); }
 .habit-chip__streak { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); font-weight: 400; }
 
+/* Tiles that open something */
+.tile-btn { display: block; width: 100%; color: inherit; text-align: left; cursor: pointer; transition: border-color 180ms ease, transform 180ms ease; }
+.tile-btn:active { transform: scale(0.985); }
+a.tile-btn:hover { text-decoration: none; }
+@media (hover: hover) { .tile-btn:hover { border-color: var(--line-strong); } }
+
 /* Level and XP */
-.lvl { display: flex; flex-direction: column; min-height: 178px; padding: 18px; border: 0; width: 100%; text-align: left; color: inherit; }
+.lvl { display: flex; flex-direction: column; min-height: 178px; padding: 18px; }
 .lvl__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .lvl__num { font-family: var(--font-dot); font-size: 76px; font-weight: 800; line-height: 0.8; margin: 18px 0 6px; text-shadow: 0 0 26px color-mix(in srgb, var(--accent) 38%, transparent); }
 .lvl__mark { font-weight: 700; letter-spacing: -0.015em; }
 .lvl__sub { font-size: 12px; color: var(--ink-3); font-family: var(--font-mono); margin: 2px 0 12px; }
 .lvl .ruler { margin-top: auto; }
-.ring-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 178px; padding: 16px 12px 14px; border: 0; width: 100%; color: inherit; gap: 8px; }
+.ring-tile { display: flex; flex-direction: column; align-items: center; justify-content: space-between; min-height: 178px; padding: 16px 12px 16px; gap: 10px; text-align: center; }
+.ring-tile .overline { align-self: flex-start; padding-left: 6px; }
 .ring { position: relative; width: 112px; height: 112px; }
 .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
 .ring__track { stroke: var(--soft-2); }
@@ -927,7 +936,7 @@ a.chip:hover { text-decoration: none; }
   background: radial-gradient(60% 80% at 50% 100%, rgba(110, 150, 255, 0.3), transparent 72%), var(--surface);
   border: 1px solid var(--tile-edge);
 }
-.horizon-orb .orb { --s: 132px; margin-bottom: -58px; }
+.horizon-orb .orb { --s: 132px; margin-bottom: 0; }
 .horizon-orb::after {
   content: "";
   position: absolute;
@@ -959,7 +968,9 @@ a.chip:hover { text-decoration: none; }
 .prose strong { font-weight: 700; }
 .caret { display: inline-block; width: 2px; height: 1.05em; margin-left: 2px; vertical-align: -0.15em; background: currentColor; animation: blink 1s steps(2) infinite; }
 
+.main--chat { padding-bottom: 0; }
 .jarvis { display: flex; flex-direction: column; min-height: calc(100dvh - env(safe-area-inset-top) - 8px); max-width: 760px; margin: 0 auto; }
+@media (min-width: 900px) { .main--chat { padding-bottom: 0; } .jarvis { min-height: calc(100dvh - 34px); } }
 .jarvis__head {
   position: sticky;
   top: 0;
@@ -1009,6 +1020,8 @@ a.chip:hover { text-decoration: none; }
 .act__undo:hover { color: var(--ink); background: var(--soft); }
 .act--undone { opacity: 0.5; }
 .act--undone .act__detail { text-decoration: line-through; }
+.act--pending { background: var(--soft); border-color: transparent; }
+.act--pending .icon { color: var(--ink-3); animation: blink 1s ease-in-out infinite; }
 .act--failed { background: var(--danger-soft); border-color: transparent; }
 .act--failed .icon { color: var(--danger); }
 .jarvis-note { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 16px; background: var(--danger-soft); font-size: 14px; }

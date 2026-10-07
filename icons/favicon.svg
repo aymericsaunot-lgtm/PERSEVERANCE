@@ -1,5 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="16" fill="#0F7F78"/>
-  <path d="M12 46h40" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
-  <path d="M13 44c9 0 11.5-25 19-25s10 25 19 25" fill="none" stroke="#FFFFFF" stroke-width="3.6" stroke-linecap="round"/>
+  <defs>
+    <radialGradient id="orb" cx="38%" cy="32%" r="72%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.16" stop-color="#c9f7ff"/>
+      <stop offset="0.42" stop-color="#6fcbff"/>
+      <stop offset="0.74" stop-color="#7a5cff"/>
+      <stop offset="1" stop-color="#25165f"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0.45" stop-color="#7fc8ff" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#7fc8ff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="#0c0c0e"/>
+  <circle cx="32" cy="32" r="25" fill="url(#glow)"/>
+  <circle cx="32" cy="32" r="14.5" fill="url(#orb)"/>
 </svg>

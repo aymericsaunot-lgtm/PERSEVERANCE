@@ -1,7 +1,8 @@
 import { html, useState, useMemo, useEffect } from '../../vendor/preact.js';
 import { actions } from '../store.js';
-import { Icon, Check, Section, Segmented, Sheet, Field, Empty, DatePick, DangerButton, toast } from '../ui.js';
-import { todayISO, addDays, relDays, fmtDate, daysBetween } from '../lib/dates.js';
+import { Icon, Check, Section, Segmented, Sheet, Field, Empty, DatePick, DangerButton, PageHead, toast } from '../ui.js';
+import { todayISO, addDays, relDays, fmtDate, daysBetween, isoOf } from '../lib/dates.js';
+import { XP } from '../lib/xp.js';
 
 const AREA_HUES = ['#0F7F78', '#5865D6', '#D9480F', '#8B5CF6', '#5C8A12', '#0369A1', '#BE185D', '#B45309'];
 export function areaColor(area, areas) {
@@ -23,7 +24,7 @@ export function completeTask(task) {
   const done = !task.done;
   actions.update('tasks', task.id, { done, doneAt: done ? Date.now() : null });
   if (done) {
-    toast('Task done', { action: 'Undo', onAction: () => actions.update('tasks', task.id, { done: false, doneAt: null }) });
+    toast('Task done', { xp: task.starred ? XP.starredTask : XP.task, action: 'Undo', onAction: () => actions.update('tasks', task.id, { done: false, doneAt: null }) });
   }
 }
 
@@ -205,8 +206,9 @@ export function TasksView({ state }) {
     body = html`<div class="group">${items.map((t) => html`<${TaskRow} key=${t.id} task=${t} areas=${areas} onOpen=${setOpen} />`)}</div>`;
   }
 
+  const doneToday = tasks.filter((t) => t.done && t.doneAt && isoOf(new Date(t.doneAt)) === today).length;
   return html`<div>
-    <h1 class="page-title">Tasks</h1>
+    <${PageHead} over=${`${tasks.filter((t) => !t.done).length} open · ${doneToday} done today`} title="Tasks" />
     <div class="group" style="margin-bottom:18px">
       <${QuickAddTask} areas=${areas} defaultDue=${tab === 'today' ? today : ''} placeholder=${tab === 'today' ? 'Add a task for today' : 'Add a task'} compact=${true} />
     </div>

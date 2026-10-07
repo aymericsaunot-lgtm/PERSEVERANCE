@@ -29,7 +29,7 @@ async function fetchJSON(url) {
   }
 }
 
-export async function loadForecast(spot, { force = false, demo = false } = {}) {
+export async function loadForecast(spot, { force = false } = {}) {
   const key = `${Number(spot.lat).toFixed(3)},${Number(spot.lon).toFixed(3)}`;
   const cached = readCache();
   if (!force && cached && cached.key === key && Date.now() - cached.at < MAX_AGE) return { ...cached.data, cachedAt: cached.at };
@@ -44,7 +44,6 @@ export async function loadForecast(spot, { force = false, demo = false } = {}) {
     return { ...data, cachedAt: Date.now() };
   } catch (e) {
     if (cached && cached.key === key) return { ...cached.data, cachedAt: cached.at, stale: true };
-    if (demo) return { ...demoForecast(spot), cachedAt: Date.now(), sample: true };
     throw e;
   }
 }
@@ -170,6 +169,8 @@ export function summarize(fc, spot, nowMs = Date.now()) {
   }
 
   const dayStart = tidePoints.length ? tidePoints[0].t : hours.length ? hours[0].t : nowS;
+  const rise = sunrise.get(today);
+  const set = sunset.get(today);
   return {
     tz,
     now,
@@ -178,43 +179,7 @@ export function summarize(fc, spot, nowMs = Date.now()) {
     hours,
     dayStart,
     nowFrac: (nowS - dayStart) / (24 * 3600),
+    sun: { rise: rise ? fmtTime(rise * 1000, tz) : '', set: set ? fmtTime(set * 1000, tz) : '' },
   };
 }
 
-// Offline and preview fallback: a plausible synthetic Atlantic forecast.
-export function demoForecast(spot) {
-  const start = Math.floor(new Date().setHours(0, 0, 0, 0) / 1000);
-  const off = -new Date().getTimezoneOffset() * 60;
-  const time = [];
-  const H = { wave_height: [], wave_direction: [], wave_period: [], swell_wave_height: [], swell_wave_direction: [], swell_wave_period: [], sea_level_height_msl: [], sea_surface_temperature: [] };
-  const W = { time: [], wind_speed_10m: [], wind_direction_10m: [], wind_gusts_10m: [] };
-  for (let h = 0; h < 24 * 6; h++) {
-    const t = start + h * 3600;
-    const day = h / 24;
-    const swell = 1.1 + 0.6 * Math.sin(day * 1.3 + 0.5) + 0.15 * Math.sin(h / 5);
-    time.push(t);
-    W.time.push(t);
-    H.swell_wave_height.push(+swell.toFixed(2));
-    H.wave_height.push(+(swell + 0.25).toFixed(2));
-    H.swell_wave_period.push(+(11 + 2 * Math.sin(day * 0.9)).toFixed(1));
-    H.wave_period.push(+(9 + 1.5 * Math.sin(day * 0.9)).toFixed(1));
-    H.swell_wave_direction.push(305 + Math.round(10 * Math.sin(day)));
-    H.wave_direction.push(310);
-    H.sea_level_height_msl.push(+(1.6 * Math.cos((2 * Math.PI * (h - 3)) / 12.42)).toFixed(2));
-    H.sea_surface_temperature.push(18.4);
-    const hourOfDay = h % 24;
-    W.wind_speed_10m.push(+(6 + 9 * Math.max(0, Math.sin(((hourOfDay - 9) / 24) * 2 * Math.PI)) + 3 * Math.sin(day * 2)).toFixed(1));
-    W.wind_direction_10m.push(hourOfDay < 11 ? 160 : 300);
-    W.wind_gusts_10m.push(+(W.wind_speed_10m[h] * 1.5).toFixed(1));
-  }
-  const daily = { time: [], sunrise: [], sunset: [] };
-  for (let d = 0; d < 6; d++) {
-    daily.time.push(start + d * 86400);
-    daily.sunrise.push(start + d * 86400 + 8 * 3600);
-    daily.sunset.push(start + d * 86400 + 19 * 3600 + 20 * 60);
-  }
-  return {
-    marine: { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, utc_offset_seconds: off, hourly: { time, ...H } },
-    wind: { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, utc_offset_seconds: off, hourly: W, daily },
-  };
-}

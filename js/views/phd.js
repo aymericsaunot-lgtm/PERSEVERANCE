@@ -260,7 +260,7 @@ export function PhdView({ state }) {
   const nextN = next ? daysBetween(today, next.date) : null;
   return html`<div>
     <${PageHead} over=${`Thesis ${pct}%${target ? ` · submission ${relDays(target, today).text}` : ''}`} title="PhD" />
-    ${next && html`<div class="group aura milestone">
+    ${next && html`<div class="milestone">
       <div>
         <div class="milestone__num num">${nextN === 0 ? 'NOW' : nextN}</div>
         <div class="milestone__unit">${nextN === 0 ? (next.kind === 'beamtime' ? next.side : 'today') : nextN === 1 ? 'day to go' : 'days to go'}</div>
@@ -268,7 +268,7 @@ export function PhdView({ state }) {
       <div class="milestone__what">
         <span class="overline">${next.kind === 'beamtime' ? 'Next beamtime' : next.kind === 'thesis' ? 'Submission' : 'Next deadline'}</span>
         <div class="milestone__title">${next.title}</div>
-        <div class="row__sub">${next.sub || fmtDate(next.date)}</div>
+        <div class="milestone__sub">${next.sub || fmtDate(next.date)}</div>
       </div>
     </div>`}
     <div class="grid-2">

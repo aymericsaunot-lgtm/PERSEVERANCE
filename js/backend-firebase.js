@@ -69,11 +69,11 @@ export function createFirebaseBackend(config, { onError }) {
     listen('tasks-open', query(userCol('tasks'), where('done', '==', false)), (docs) => { open = docs; pushTasks(); });
     listen('tasks-done', query(userCol('tasks'), where('doneAt', '>=', doneCutoff)), (docs) => { done = docs; pushTasks(); });
     listen('sessions', query(userCol('sessions'), where('date', '>=', sessionCutoff)), (docs) => setDocs('sessions', docs));
-    for (const name of ['papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'habits', 'memories']) {
+    for (const name of ['papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'habits']) {
       listen(name, userCol(name), (docs) => setDocs(name, docs));
     }
     listen('meta', userCol('meta'), (docs) => {
-      setMetaDocs({ progress: docs.find((d) => d.id === 'progress'), briefing: docs.find((d) => d.id === 'briefing') });
+      setMetaDocs({ progress: docs.find((d) => d.id === 'progress') });
       setArxivStatus(docs.find((d) => d.id === 'arxiv') || null);
       setSettingsDoc(docs.find((d) => d.id === 'settings'));
     });

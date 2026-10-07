@@ -1,130 +1,29 @@
 import { html, useState, useRef, useEffect } from '../../vendor/preact.js';
 import { actions, getBackend } from '../store.js';
-import { Icon, Orb, Section, Field, Segmented, TagEditor, DangerButton, PageHead, toast, downloadFile } from '../ui.js';
+import { Icon, Section, Field, Segmented, TagEditor, PageHead, toast, downloadFile } from '../ui.js';
 import { compass } from '../lib/surf.js';
-import { todayISO, fmtDate, isoOf } from '../lib/dates.js';
+import { todayISO } from '../lib/dates.js';
 import { APP_VERSION } from '../version.js';
-import { getApiKey, setApiKey, testApiKey, describeError, voiceOn, setVoice, useJarvis, DEPTHS, MODEL_LABEL } from '../lib/jarvis.js';
 
 const CATEGORY_SUGGESTIONS = ['cond-mat', 'cond-mat.str-el', 'cond-mat.mtrl-sci', 'cond-mat.mes-hall', 'cond-mat.supr-con', 'quant-ph', 'physics.app-ph', 'physics.optics'];
 
-// Dark is the default look; Match system follows the device.
+// Paper is the default; Night and Match system are a tap away in Settings.
+// A new storage key, so the old automatic value does not carry over.
+const THEME_KEY = 'dash.theme2';
 export function getTheme() {
-  try { return localStorage.getItem('dash.theme') || 'dark'; } catch (e) { return 'dark'; }
+  try { return localStorage.getItem(THEME_KEY) || 'light'; } catch (e) { return 'light'; }
 }
 
-const THEME_COLORS = { dark: '#070708', light: '#ECECE9' };
+const THEME_COLORS = { dark: '#171612', light: '#EEEAE0' };
 
 export function applyTheme(theme) {
-  const root = document.documentElement;
-  if (theme === 'light' || theme === 'dark') root.dataset.theme = theme;
-  else delete root.dataset.theme;
+  const t = theme === 'dark' || theme === 'auto' ? theme : 'light';
+  document.documentElement.dataset.theme = t;
   document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
     const systemDark = (m.getAttribute('media') || '').includes('dark');
-    m.setAttribute('content', THEME_COLORS[theme === 'light' || theme === 'dark' ? theme : systemDark ? 'dark' : 'light']);
+    m.setAttribute('content', THEME_COLORS[t === 'auto' ? (systemDark ? 'dark' : 'light') : t]);
   });
-  try { localStorage.setItem('dash.theme', theme); } catch (e) { /* ignore */ }
-}
-
-function JarvisSettings({ settings }) {
-  useJarvis();
-  const saved = getApiKey();
-  const [key, setKey] = useState('');
-  const [check, setCheck] = useState(saved ? { state: 'saved' } : { state: 'none' });
-  const jarvis = settings.jarvis || {};
-
-  const saveKey = async (e) => {
-    e.preventDefault();
-    const k = key.trim();
-    if (!k) return;
-    if (!/^sk-ant-/.test(k)) { setCheck({ state: 'bad', message: 'Anthropic API keys start with sk-ant-.' }); return; }
-    setCheck({ state: 'testing' });
-    try {
-      await testApiKey(k);
-      setApiKey(k);
-      setKey('');
-      setCheck({ state: 'ok', message: `Key works. ${MODEL_LABEL} is available.` });
-      toast('Jarvis is online');
-    } catch (err) {
-      setCheck({ state: 'bad', message: describeError(err) });
-    }
-  };
-  const remove = () => { setApiKey(''); setCheck({ state: 'none' }); toast('API key removed from this device'); };
-  const recheck = async () => {
-    setCheck({ state: 'testing' });
-    try { await testApiKey(getApiKey()); setCheck({ state: 'ok', message: `Key works. ${MODEL_LABEL} is available.` }); } catch (err) { setCheck({ state: 'bad', message: describeError(err) }); }
-  };
-
-  const statusText = {
-    none: 'No key on this device.',
-    saved: `Key saved on this device (ends in ${saved.slice(-4)}).`,
-    testing: 'Checking the key with Anthropic…',
-    ok: check.message,
-    bad: check.message,
-  }[check.state];
-
-  return html`<div class="group group--pad aura aura--jarvis" style="--ax: 0%; --ay: 0%">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-      <${Orb} size=${34} live=${check.state === 'testing'} />
-      <div>
-        <div style="font-weight:700">${saved ? 'Online' : 'Offline'}</div>
-        <div class="faint" style="font-size:13px">${MODEL_LABEL}, with your own API key</div>
-      </div>
-    </div>
-    <form onSubmit=${saveKey}>
-      <${Field} label="Anthropic API key" hint="Create one in the Claude Console (console.anthropic.com), API keys. Set a monthly spend limit there too: a day of normal use costs a few cents.">
-        <div style="display:flex;gap:8px">
-          <input class="input" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder=${saved ? 'Paste a new key to replace it' : 'sk-ant-…'} value=${key} onInput=${(e) => setKey(e.currentTarget.value)} />
-          <button class="btn btn--primary" type="submit" disabled=${!key.trim() || check.state === 'testing'}>Save</button>
-        </div>
-      </${Field}>
-    </form>
-    <div class=${'key-status' + (check.state === 'bad' ? ' key-status--bad' : saved ? '' : ' key-status--off')} role="status">
-      <span class="dot"></span><span style="flex:1">${statusText}</span>
-      ${saved && check.state !== 'testing' && html`<button class="link-btn" style="font-size:13px" onClick=${recheck}>Test</button><button class="link-btn" style="font-size:13px;color:var(--danger)" onClick=${remove}>Remove</button>`}
-    </div>
-    <p class="field__hint" style="margin-top:12px">The key is stored only in this browser. It is never synced, exported or sent anywhere except Anthropic. Add it once on each device you use.</p>
-
-    <div class="field" style="margin-top:20px">
-      <span class="field__label">Thinking</span>
-      <${Segmented} label="How much Jarvis thinks before answering" value=${jarvis.depth || 'low'} onChange=${(d) => actions.saveSettings({ jarvis: { ...jarvis, depth: d } })} items=${DEPTHS} />
-      <span class="field__hint">Quick answers fast and costs least. Deep thinks longer for planning and tricky questions.</span>
-    </div>
-    <div class="field" style="margin-top:16px">
-      <span class="field__label">Daily briefing</span>
-      <${Segmented} label="Daily briefing" value=${jarvis.briefing === false ? 'off' : 'on'} onChange=${(v) => actions.saveSettings({ jarvis: { ...jarvis, briefing: v === 'on' } })} items=${[{ id: 'on', label: 'On' }, { id: 'off', label: 'Off' }]} />
-      <span class="field__hint">Written once a day when you open Today, and shared with your other devices.</span>
-    </div>
-    <div class="field" style="margin-top:16px">
-      <span class="field__label">Voice on this device</span>
-      <${Segmented} label="Read replies aloud" value=${voiceOn() ? 'on' : 'off'} onChange=${(v) => setVoice(v === 'on')} items=${[{ id: 'off', label: 'Silent' }, { id: 'on', label: 'Read replies aloud' }]} />
-    </div>
-  </div>`;
-}
-
-function Profile({ profile }) {
-  const [f, setF] = useState({ name: profile.name || '', about: profile.about || '' });
-  return html`<div class="group group--pad">
-    <${Field} label="What should Jarvis call you?" hint="Your first name, a nickname, or sir. Leave it empty for no name.">
-      <input class="input" value=${f.name} maxlength="40" onInput=${(e) => setF({ ...f, name: e.currentTarget.value })} />
-    </${Field}>
-    <${Field} label="About you" hint="What you work on, what you are aiming for, what to push you on. Jarvis reads this before every conversation.">
-      <textarea class="textarea" value=${f.about} maxlength="1500" placeholder="PhD in ARPES on 2D materials, defending in 2027. I surf most days. Push me on writing: I avoid it." onInput=${(e) => setF({ ...f, about: e.currentTarget.value })}></textarea>
-    </${Field}>
-    <div style="display:flex;margin-top:16px"><button class="btn btn--primary" style="margin-left:auto" onClick=${() => { actions.saveSettings({ profile: { name: f.name.trim(), about: f.about.trim() } }); toast('Saved. Jarvis uses it from the next conversation.'); }}>Save</button></div>
-  </div>`;
-}
-
-function Memories({ memories }) {
-  const list = memories.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
-  const forgetAll = () => { for (const m of memories) actions.remove('memories', m.id); toast('Jarvis forgot everything'); };
-  return html`<div class="group">
-    ${list.length ? list.map((m) => html`<div key=${m.id} class="memory-row">
-      <p>${m.text}<span class="faint" style="display:block;font-size:12px;margin-top:2px">${m.at ? `Saved ${fmtDate(isoOf(new Date(m.at)))}` : ''}</span></p>
-      <button class="icon-btn icon-btn--sm" aria-label=${'Forget: ' + m.text} onClick=${() => actions.remove('memories', m.id)}><${Icon} name="x" size="xs" /></button>
-    </div>`) : html`<p class="muted" style="padding:16px 18px">Nothing yet. Tell Jarvis something worth keeping, such as a goal or a routine, and it lands here.</p>`}
-    ${list.length > 1 && html`<div style="padding:4px 10px 12px"><${DangerButton} label="Forget everything" armedLabel="Tap again to forget all" onConfirm=${forgetAll} /></div>`}
-  </div>`;
+  try { localStorage.setItem(THEME_KEY, t); } catch (e) { /* ignore */ }
 }
 
 function SurfSpot({ surf }) {
@@ -224,17 +123,14 @@ export function SettingsView({ state, sub, install, onSignOut }) {
     <${PageHead} over=${`Version ${APP_VERSION}`} title="Settings" />
     <div class="grid-2">
       <div class="stack">
-        <${Section} title="Jarvis" id="jarvis"><${JarvisSettings} settings=${s} /></${Section}>
-        <${Section} title="About you" id="profile"><${Profile} key=${JSON.stringify(s.profile)} profile=${s.profile || {}} /></${Section}>
-        <${Section} title="What Jarvis remembers" meta=${String(state.data.memories.length)}><${Memories} memories=${state.data.memories} /></${Section}>
         <${Section} title="Account">
           <div class="group">
             <div class="row">
               <div class="row__main">
-                <div class="row__title">${st.mode === 'demo' ? 'Demo mode' : (st.user && st.user.email) || 'Signed in'}</div>
-                <div class="row__sub">${st.mode === 'demo' ? 'Nothing you change here is saved.' : `Sync ${st.sync === 'synced' ? 'is up to date' : st.sync === 'syncing' ? 'is sending changes' : st.sync === 'offline' ? 'resumes when you are back online' : 'is connecting'}`}</div>
+                <div class="row__title">${(st.user && st.user.email) || 'Signed in'}</div>
+                <div class="row__sub">Sync ${st.sync === 'synced' ? 'is up to date' : st.sync === 'syncing' ? 'is sending changes' : st.sync === 'offline' ? 'resumes when you are back online' : 'is connecting'}</div>
               </div>
-              <button class="btn btn--ghost btn--sm" onClick=${onSignOut}><${Icon} name="logout" size="xs" />${st.mode === 'demo' ? 'Leave demo' : 'Sign out'}</button>
+              <button class="btn btn--ghost btn--sm" onClick=${onSignOut}><${Icon} name="logout" size="xs" />Sign out</button>
             </div>
           </div>
         </${Section}>
@@ -266,7 +162,7 @@ export function SettingsView({ state, sub, install, onSignOut }) {
         <${Section} title="Thesis"><${Thesis} key=${JSON.stringify(s.thesis)} thesis=${s.thesis} /></${Section}>
         <${Section} title="Appearance">
           <div class="group group--pad">
-            <${Segmented} label="Theme" value=${theme} onChange=${(t) => { setTheme(t); applyTheme(t); }} items=${[{ id: 'dark', label: 'Dark' }, { id: 'light', label: 'Light' }, { id: 'auto', label: 'Match system' }]} />
+            <${Segmented} label="Theme" value=${theme} onChange=${(t) => { setTheme(t); applyTheme(t); }} items=${[{ id: 'light', label: 'Paper' }, { id: 'dark', label: 'Night' }, { id: 'auto', label: 'Match system' }]} />
             <p class="field__hint" style="margin-top:10px">Saved on this device only.</p>
           </div>
         </${Section}>

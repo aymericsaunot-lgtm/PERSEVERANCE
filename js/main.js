@@ -1,8 +1,8 @@
-// Entry point: picks the backend, handles sign-in, renders the app shell.
+// Entry point: Firebase sign-in, then the app shell. There is no way in without your password.
 import { html, render, useState, useEffect } from '../vendor/preact.js';
 import { config } from '../config.js';
 import { attachBackend, getBackend, setStatus, useStore, getState, dataReady, actions } from './store.js';
-import { Icon, Mark, Orb, Toasts, toast } from './ui.js';
+import { Icon, Mark, Toasts, toast } from './ui.js';
 import { TodayView } from './views/today.js';
 import { TasksView, todayTasks } from './views/tasks.js';
 import { PapersView } from './views/papers.js';
@@ -10,12 +10,9 @@ import { PhdView } from './views/phd.js';
 import { LifeView } from './views/life.js';
 import { SettingsView, applyTheme, getTheme } from './views/settings.js';
 import { LoginView, SetupView } from './views/login.js';
-import { JarvisView } from './views/jarvis.js';
 import { ProgressView, SideLevel, LevelUp } from './views/progress.js';
 import { progressOf, archivePatch } from './lib/xp.js';
-import { useJarvis } from './lib/jarvis.js';
 import { todayISO } from './lib/dates.js';
-import { createDemoBackend } from './backend-demo.js';
 
 applyTheme(getTheme());
 
@@ -73,24 +70,8 @@ window.addEventListener('beforeinstallprompt', (e) => {
 });
 
 function SyncBadge({ status }) {
-  if (status.mode === 'demo') return html`<span class="sync"><span class="sync__dot"></span>Demo</span>`;
   const label = { synced: 'Synced', syncing: 'Saving', offline: 'Offline', connecting: 'Connecting' }[status.sync] || 'Synced';
   return html`<span class=${'sync sync--' + status.sync} title="Sync status"><span class="sync__dot"></span>${label}</span>`;
-}
-
-// Phones: the sections in a floating glass dock, Jarvis as the orb beside it.
-function Dock({ active, counts, jarvisLive }) {
-  return html`<div class="dock-wrap">
-    <nav class="dock" aria-label="Sections">
-      ${NAV.map((n) => html`<button key=${n.id} class="dock__item" aria-current=${active === n.id ? 'page' : undefined} aria-label=${n.label} onClick=${() => go(n.id)}>
-        <${Icon} name=${n.icon} /><span class="dock__label">${n.label}</span>
-        ${counts[n.id] > 0 && n.id !== 'tasks' && html`<span class="dock__badge"></span>`}
-      </button>`)}
-    </nav>
-    <button class="dock-orb" aria-label="Jarvis" aria-current=${active === 'jarvis' ? 'page' : undefined} onClick=${() => go('jarvis')}>
-      <${Orb} size=${30} live=${jarvisLive} />
-    </button>
-  </div>`;
 }
 
 // Level-ups seen on this device, and freezing finished days into meta/progress.
@@ -100,7 +81,7 @@ function useProgressKeeping(state, p) {
   const today = todayISO();
   useEffect(() => {
     if (!ready) return;
-    const key = `dash.level.best.${state.status.mode || 'app'}`;
+    const key = 'dash.level.best';
     let best = 0;
     try { best = Number(localStorage.getItem(key)) || 0; } catch (e) { /* storage unavailable */ }
     if (p.level <= best) return;
@@ -118,7 +99,6 @@ function useProgressKeeping(state, p) {
 function Shell({ state, onSignOut }) {
   const route = useRoute();
   const [main, sub] = route.split('/');
-  const j = useJarvis();
   const p = progressOf(state.data);
   const [levelUp, closeLevelUp] = useProgressKeeping(state, p);
   const counts = {
@@ -134,55 +114,44 @@ function Shell({ state, onSignOut }) {
   else if (main === 'papers') view = html`<${PapersView} state=${state} sub=${sub} go=${go} />`;
   else if (main === 'phd') view = html`<${PhdView} state=${state} go=${go} />`;
   else if (main === 'life') view = html`<${LifeView} state=${state} go=${go} />`;
-  else if (main === 'jarvis') view = html`<${JarvisView} state=${state} go=${go} />`;
   else if (main === 'progress') view = html`<${ProgressView} state=${state} p=${p} go=${go} />`;
   else if (main === 'settings') view = html`<${SettingsView} state=${state} sub=${sub} go=${go} install=${install} onSignOut=${onSignOut} />`;
-  else view = html`<${TodayView} state=${state} go=${go} />`;
-  const active = NAV.some((n) => n.id === main) || ['settings', 'jarvis', 'progress'].includes(main) ? main : 'today';
-  const chat = main === 'jarvis';
+  else view = html`<${TodayView} state=${state} p=${p} go=${go} />`;
+  const active = NAV.some((n) => n.id === main) || ['settings', 'progress'].includes(main) ? main : 'today';
 
   return html`<div class="shell">
     <nav class="sidebar" aria-label="Sections">
       <div class="sidebar__brand"><${Mark} size=${30} />${config.appName || 'Dashboard'}</div>
       ${NAV.map((n) => html`<button key=${n.id} class="sidebar__item" aria-current=${active === n.id ? 'page' : undefined} onClick=${() => go(n.id)}>
-        <${Icon} name=${n.icon} />${n.label}
-        ${counts[n.id] > 0 && html`<span class="sidebar__count num">${counts[n.id]}</span>`}
+        <${Icon} name=${n.icon} size="sm" />${n.label}
+        ${counts[n.id] > 0 && html`<span class="sidebar__count">${counts[n.id]}</span>`}
       </button>`)}
-      <button class="side-jarvis aura" aria-current=${active === 'jarvis' ? 'page' : undefined} onClick=${() => go('jarvis')}>
-        <${Orb} size=${30} live=${j.busy} />
-        <div><div class="side-jarvis__name">Jarvis</div><div class="side-jarvis__sub">${j.busy ? 'Thinking' : 'Ask anything'}</div></div>
-      </button>
       <div class="sidebar__foot">
         <${SideLevel} p=${p} go=${go} active=${active === 'progress'} />
-        <div style="padding:0 4px 2px"><${SyncBadge} status=${state.status} /></div>
-        <button class="sidebar__item" aria-current=${active === 'settings' ? 'page' : undefined} onClick=${() => go('settings')}><${Icon} name="settings" />Settings</button>
+        <div><${SyncBadge} status=${state.status} /></div>
+        <button class="sidebar__item" aria-current=${active === 'settings' ? 'page' : undefined} onClick=${() => go('settings')}><${Icon} name="settings" size="sm" />Settings</button>
       </div>
     </nav>
-    <main class=${'main' + (chat ? ' main--chat' : '')} id="main">
-      ${state.status.mode === 'demo' && !chat && html`<div class="demo-banner">${window.__DASH_PREVIEW__
-        ? 'Sample data. Paper lookup, live surf and downloads work in your own copy.'
-        : 'Demo with sample data. Nothing is saved.'}</div>`}
-      ${!chat && html`<div class="topbar topbar--mobile-only">
+    <main class="main" id="main">
+      <div class="topbar topbar--mobile-only">
         <div class="topbar__tools">
           <${SyncBadge} status=${state.status} />
           <button class="icon-btn" aria-label="Settings" onClick=${() => go('settings')}><${Icon} name="settings" /></button>
         </div>
-      </div>`}
+      </div>
       ${view}
     </main>
-    ${!chat && html`<${Dock} active=${active} counts=${counts} jarvisLive=${j.busy} />`}
+    <nav class="tabbar" aria-label="Sections">
+      ${NAV.map((n) => html`<button key=${n.id} class="tabbar__item" aria-current=${active === n.id ? 'page' : undefined} onClick=${() => go(n.id)}>
+        <span class="tabbar__icon"><${Icon} name=${n.icon} />${counts[n.id] > 0 && n.id !== 'tasks' && html`<span class="tabbar__badge">${counts[n.id]}</span>`}</span>
+        ${n.label}
+      </button>`)}
+    </nav>
     ${levelUp > 0 && html`<${LevelUp} level=${levelUp} onClose=${closeLevelUp} />`}
   </div>`;
 }
 
 let describeErrorFn = (e) => (e && e.message) || 'Something went wrong.';
-
-function startDemo() {
-  const b = createDemoBackend();
-  attachBackend(b);
-  setStatus({ mode: 'demo', phase: 'ready', user: { email: 'demo' }, sync: 'synced' });
-  b.start();
-}
 
 async function startFirebase() {
   setStatus({ phase: 'loading' });
@@ -202,8 +171,6 @@ async function startFirebase() {
 }
 
 function boot() {
-  const params = new URLSearchParams(location.search);
-  if (window.__DASH_PREVIEW__ || params.has('demo')) return startDemo();
   if (!config.firebase || !config.firebase.apiKey) return setStatus({ phase: 'setup' });
   startFirebase().catch((e) => {
     console.error(e);
@@ -215,29 +182,23 @@ function App() {
   const state = useStore();
   const phase = state.status.phase;
   const onSignOut = async () => {
-    const b = getBackend();
-    if (state.status.mode === 'demo') {
-      if (window.__DASH_PREVIEW__) { toast('This preview always runs the demo'); return; }
-      location.href = location.pathname;
-      return;
-    }
-    await b.signOut();
+    await getBackend().signOut();
     go('today');
   };
   let body;
   if (phase === 'ready') body = html`<${Shell} state=${state} onSignOut=${onSignOut} />`;
-  else if (phase === 'login') body = html`<${LoginView} backend=${getBackend()} describeError=${describeErrorFn} onDemo=${() => { location.href = location.pathname + '?demo'; }} />`;
-  else if (phase === 'setup') body = html`<${SetupView} onDemo=${startDemo} />`;
+  else if (phase === 'login') body = html`<${LoginView} backend=${getBackend()} describeError=${describeErrorFn} />`;
+  else if (phase === 'setup') body = html`<${SetupView} />`;
   else if (phase === 'error') body = html`<div class="splash"><p>Could not start: ${state.status.error}</p></div>`;
-  else body = html`<div class="splash" aria-busy="true"><${Mark} size=${44} /></div>`;
+  else body = html`<div class="splash" aria-busy="true"><${Mark} size=${40} /></div>`;
   return html`${body}<${Toasts} />`;
 }
 
 render(html`<${App} />`, document.getElementById('app'));
 boot();
 
-// Offline support and updates. The preview build skips this.
-if ('serviceWorker' in navigator && !window.__DASH_PREVIEW__ && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+// Offline support and updates.
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   const hadController = !!navigator.serviceWorker.controller;
   navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('Service worker not registered', e));
   navigator.serviceWorker.addEventListener('controllerchange', () => {

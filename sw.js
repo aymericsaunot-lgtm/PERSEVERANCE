@@ -10,21 +10,16 @@ const SHELL = [
   './css/app.css',
   './vendor/preact.js',
   './vendor/firebase.js',
-  './vendor/anthropic.js',
   './js/main.js',
   './js/store.js',
   './js/ui.js',
   './js/version.js',
-  './js/backend-demo.js',
   './js/backend-firebase.js',
-  './js/demo-data.js',
   './js/lib/dates.js',
-  './js/lib/jarvis.js',
   './js/lib/papers.js',
   './js/lib/surf.js',
   './js/lib/text.js',
   './js/lib/xp.js',
-  './js/views/jarvis.js',
   './js/views/life.js',
   './js/views/login.js',
   './js/views/papers.js',
@@ -33,12 +28,12 @@ const SHELL = [
   './js/views/settings.js',
   './js/views/tasks.js',
   './js/views/today.js',
-  './fonts/manrope-latin.woff2',
-  './fonts/manrope-latin-ext.woff2',
-  './fonts/manrope-greek.woff2',
-  './fonts/doto-latin.woff2',
-  './fonts/dmmono-400-latin.woff2',
-  './fonts/dmmono-500-latin.woff2',
+  './fonts/instrument-serif-normal-latin.woff2',
+  './fonts/instrument-serif-normal-latin-ext.woff2',
+  './fonts/instrument-serif-italic-latin.woff2',
+  './fonts/instrument-serif-italic-latin-ext.woff2',
+  './fonts/instrument-sans-normal-latin.woff2',
+  './fonts/instrument-sans-normal-latin-ext.woff2',
   './fonts/stix-latin-400.woff2',
   './fonts/stix-latin-400-italic.woff2',
   './fonts/stix-latin-500.woff2',
@@ -74,7 +69,7 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // Firebase, Anthropic, Crossref, arXiv and Open-Meteo go straight to the network.
+  // Firebase, Crossref, arXiv and Open-Meteo go straight to the network.
   if (url.origin !== self.location.origin) return;
 
   if (req.mode === 'navigate') {

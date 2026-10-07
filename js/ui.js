@@ -59,31 +59,14 @@ export function Icon({ name, size, cls = '', label }) {
   return html`<svg class=${'icon' + sizeCls + (cls ? ' ' + cls : '')} viewBox="0 0 24 24" aria-hidden=${label ? undefined : 'true'} role=${label ? 'img' : undefined} aria-label=${label} dangerouslySetInnerHTML=${{ __html: PATHS[name] || '' }}></svg>`;
 }
 
-// The app mark: Jarvis's orb on a dark tile.
+// The app mark: a low sun over the sea, on buoy orange.
 export function Mark({ size = 28, cls = '' }) {
   return html`<svg class=${'mark ' + cls} width=${size} height=${size} viewBox="0 0 64 64" aria-hidden="true">
-    <defs>
-      <radialGradient id="mark-orb" cx="38%" cy="32%" r="72%">
-        <stop offset="0" stop-color="#ffffff" />
-        <stop offset="0.16" stop-color="#c9f7ff" />
-        <stop offset="0.42" stop-color="#6fcbff" />
-        <stop offset="0.74" stop-color="#7a5cff" />
-        <stop offset="1" stop-color="#25165f" />
-      </radialGradient>
-      <radialGradient id="mark-glow" cx="50%" cy="50%" r="50%">
-        <stop offset="0.45" stop-color="#7fc8ff" stop-opacity="0.45" />
-        <stop offset="1" stop-color="#7fc8ff" stop-opacity="0" />
-      </radialGradient>
-    </defs>
-    <rect width="64" height="64" rx="18" fill="#0c0c0e" />
-    <circle cx="32" cy="32" r="25" fill="url(#mark-glow)" />
-    <circle cx="32" cy="32" r="14.5" fill="url(#mark-orb)" />
+    <rect width="64" height="64" rx="14" fill="#DD4F1C" />
+    <circle cx="32" cy="33" r="12" fill="#F8F6F0" />
+    <path d="M0 39c7-3.5 12 3 20 0s12-4 20-1 13 3.5 24-.5V50c0 7.7-6.3 14-14 14H14C6.3 64 0 57.7 0 50z" fill="#1C1A16" />
+    <path d="M10 48.5c5-2 9 1.6 14 0M34 52.5c5-2 9 1.6 14 0" stroke="#F8F6F0" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.55" />
   </svg>`;
-}
-
-// Jarvis's orb. `live` makes it breathe while Jarvis is thinking or speaking.
-export function Orb({ size = 40, live = false, cls = '' }) {
-  return html`<span class=${'orb' + (live ? ' orb--live' : '') + (cls ? ' ' + cls : '')} style=${`--s:${size}px`} aria-hidden="true"></span>`;
 }
 
 // Width of an element in CSS pixels, kept current, for charts drawn in real pixels.

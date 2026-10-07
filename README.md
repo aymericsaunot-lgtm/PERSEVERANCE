@@ -2,18 +2,17 @@
 
 A personal dashboard that runs on your phone and your computer and stays in sync:
 
-- **Jarvis**: your assistant, running on Claude Sonnet 5.5 with your own Anthropic API key. A short briefing every day, and a chat that sees your dashboard and can add, reschedule and complete tasks, tick habits, log sport, add deadlines and remember things about you. Every change it makes can be undone.
-- **Progress**: a level system fed by what you already log. Levels are named after the suits (level 9 is Mark IX), with a daily XP goal and four attributes: Work, Mind, Body and Discipline.
-- **Today**: the next eight weeks on one line (beamtimes, deadlines, thesis), today's tasks, habits, reading, surf.
+- **Today**: an almanac front page. The date, sunrise and sunset, the next tide and the swell, a one-line summary of the day, today's tasks, habits, the next eight weeks on one line (beamtimes, deadlines, thesis), reading, surf.
+- **Progress**: a level system fed by what you already log, with a daily XP goal on a dial and four attributes: Work, Mind, Body and Discipline.
 - **Tasks**: quick capture, areas, due dates, stars. Type `#PhD` in a title to set the area, end with `!` to star it.
 - **Papers**: paste a DOI or arXiv ID and the details fill in; To read, Reading, Read; weekly, monthly and yearly counts; tags with real subscripts (MnBi₂Te₄); BibTeX export for the thesis.
 - **arXiv watch**: every weekday morning, new cond-mat papers that match your keywords, one tap to add them to your reading list.
 - **PhD**: beamtime countdowns, proposal and other deadlines, thesis chapters with progress.
 - **Life**: surf forecast (swell, wind, tide, water temperature), sport log, habits.
 
-It is a plain web app (no build step) that you install like a normal app. Data lives in your own free Firebase project. It works offline and syncs when the connection comes back.
+It is a plain web app (no build step) that you install like a normal app. Data lives in your own free Firebase project, and nothing opens without your password. It works offline and syncs when the connection comes back.
 
-Try it first: run `python3 -m http.server 8000` in this folder and open <http://localhost:8000/?demo>.
+The look is a printed almanac: paper and ink with one orange, Instrument Serif for headlines and numbers, STIX Two for paper titles. Settings, Appearance switches to the Night edition or follows your system.
 
 ---
 
@@ -103,23 +102,10 @@ Test the script on your computer without touching Firebase:
 python3 scripts/arxiv_watch.py --dry-run --keywords "MnBi2Te4, Rashba crystal, moiré"
 ```
 
-### 8. Connect Jarvis
-
-1. Go to <https://console.anthropic.com>, sign in, add a payment method under **Billing**, then open **API keys** and create a key. It starts with `sk-ant-`.
-2. Still in the Console, set a monthly **spend limit** in the limits settings. A day of normal use costs a few cents: the briefing is around one cent, a chat message less than that.
-3. In the app, open **Settings, Jarvis**, paste the key and tap **Save**. The app checks it with Anthropic without spending anything.
-4. Repeat step 3 on each device. The key is stored only in that browser: it is never synced to Firebase, never included in backups, and only ever sent to `api.anthropic.com`.
-5. Optional: in **Settings, About you**, tell Jarvis what to call you and what you are working towards. It reads this before every conversation.
-
-What Jarvis sends to Anthropic: your messages, the "About you" text, what it remembers about you, and a summary of the dashboard (open tasks, habits, beamtimes, deadlines, thesis chapters, paper titles, sport sessions, the surf forecast and your level). Nothing else leaves your devices.
-
 ---
 
 ## Everyday use
 
-- **Jarvis**: tap the orb (bottom right on a phone, Jarvis in the sidebar on a computer). Ask it anything about your day, or tell it what you did: "I surfed 90 minutes this morning", "move the Printify upload to Friday", "remind me the MAX IV report is due on the 3rd". Each change shows as a chip with an undo button. The microphone button dictates; the speaker button in the header reads replies aloud. One conversation per day; the plus button starts a fresh one.
-- **Briefing**: written once a day when you first open Today, then shared with your other devices. The refresh button on the tile writes a new one. Turn it off in Settings, Jarvis.
-- **Memories**: when you tell Jarvis something worth keeping (a goal, a routine, a preference), it saves it. Settings, What Jarvis remembers lists everything; delete anything there.
 - **XP**: task done 10 (starred 20), deadline submitted 40, beamtime completed 100, thesis progress 6 per chapter point, paper read 30, sport 1 per 2 minutes (up to 60 a session), habit ticked 10, plus 20 when every habit is done that day. Undoing something takes its XP back. Days older than a week are frozen into your data so they keep counting after finished tasks leave the 30-day sync window. Change the daily goal in Progress, How XP works.
 - **Add a paper**: paste a DOI, a doi.org link, an arXiv ID or an arXiv link. If the lookup services are unreachable, add it by hand.
 - **Counters**: a paper counts the moment you mark it Read. Moving it back clears it from the counts.
@@ -151,13 +137,11 @@ css/app.css           all styles (colours and fonts at the top)
 js/main.js            start-up, sign-in, navigation
 js/store.js           app state and the default settings
 js/backend-firebase.js  Firestore sync
-js/backend-demo.js    demo mode, js/demo-data.js holds its sample content
-js/lib/jarvis.js      Jarvis: the prompt, the dashboard summary, its tools, the conversation
 js/lib/xp.js          the level system: XP rules, levels, frozen days
 js/lib/               also dates, LaTeX and text, paper lookup and BibTeX, surf forecast
-js/views/             one file per screen (jarvis.js and progress.js are the new ones)
-vendor/               Preact, the Firebase SDK and the Anthropic SDK, bundled locally
-fonts/                Manrope, Doto, DM Mono and STIX Two, with their licences
+js/views/             one file per screen (progress.js is the level system)
+vendor/               Preact and the Firebase SDK, bundled locally
+fonts/                Instrument Serif, Instrument Sans and STIX Two, with their licences
 scripts/arxiv_watch.py  the daily arXiv check
 .github/workflows/    the GitHub schedule for that check
 ```
@@ -165,9 +149,7 @@ scripts/arxiv_watch.py  the daily arXiv check
 ## Services used
 
 - Firebase Authentication and Cloud Firestore (Spark plan) for sign-in and sync.
-- The Anthropic API (Claude Sonnet 5.5) for Jarvis, billed to your own API key. Only used once you add a key.
 - Crossref, DataCite and the arXiv API for paper details. Nothing is sent except the identifier you paste.
 - rss.arxiv.org for the daily listings.
 - Open-Meteo for the marine and wind forecast (free for non-commercial use; data from Météo-France, DWD, ECMWF and NOAA models).
-- Voice dictation uses your browser's built-in speech recognition (in Chrome it goes through Google's servers); reading aloud uses the voices installed on your device.
-- Fonts: Manrope, Doto, DM Mono and STIX Two Text, all under the SIL Open Font License.
+- Fonts: Instrument Serif, Instrument Sans and STIX Two Text, all under the SIL Open Font License.

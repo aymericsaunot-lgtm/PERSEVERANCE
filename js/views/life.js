@@ -1,5 +1,5 @@
 import { html, useState, useEffect, useMemo } from '../../vendor/preact.js';
-import { actions, getState } from '../store.js';
+import { actions } from '../store.js';
 import { Icon, Section, Sheet, Field, Empty, DatePick, DangerButton, PageHead, toast, useWidth } from '../ui.js';
 import { loadForecast, summarize, compass, SCORE_LABEL } from '../lib/surf.js';
 import { todayISO, addDays, fmtDate, fmtAgo, startOfWeek, isoOf, weekdayShort, daysBetween } from '../lib/dates.js';
@@ -10,14 +10,13 @@ export { streak };
 const inflight = new Map();
 
 export function useSurf(spot) {
-  const demo = getState().status.mode === 'demo';
   const key = `${spot.lat},${spot.lon}`;
   const [st, setSt] = useState({ loading: true, fc: null, error: null });
   const load = (force = false) => {
     setSt((s) => ({ ...s, loading: true }));
     let p = !force && inflight.get(key);
     if (!p) {
-      p = loadForecast(spot, { force, demo });
+      p = loadForecast(spot, { force });
       inflight.set(key, p);
       p.finally(() => setTimeout(() => inflight.delete(key), 2000)).catch(() => {});
     }
@@ -67,12 +66,10 @@ function TideCurve({ tide }) {
   </svg>`;
 }
 
-const skyAt = (hour) => (hour < 6 || hour >= 21 ? 'night' : hour < 9 ? 'dawn' : hour < 17 ? 'day' : 'dusk');
-
-// Today's swell as one white line over a sky that follows the hour, flag on the best session.
+// Today's swell as one line drawn on deep water, with a flag on the best session.
 function DayChart({ summary }) {
   const [ref, W] = useWidth(300, 160);
-  const H = 84;
+  const H = 96;
   const hours = summary.hours.filter((h) => h.height != null);
   if (hours.length < 3) return null;
   // Scaled to the day's own range so a 1.5 to 1.8 m day still shows its shape.
@@ -80,63 +77,55 @@ function DayChart({ summary }) {
   const lo = Math.max(0, Math.min(...hs) - 0.35);
   const hi = Math.max(...hs) + 0.2;
   const X = (t) => ((t - summary.dayStart) / 86400) * W;
-  const Y = (v) => 6 + (1 - Math.max(0, Math.min(1, (v - lo) / (hi - lo)))) * (H - 10);
+  const Y = (v) => 34 + (1 - Math.max(0, Math.min(1, (v - lo) / (hi - lo)))) * (H - 40);
   const line = hours.map((h, i) => `${i ? 'L' : 'M'}${X(h.t).toFixed(1)},${Y(h.height).toFixed(1)}`).join(' ');
-  const area = `${line} L${X(hours[hours.length - 1].t).toFixed(1)},${H} L${X(hours[0].t).toFixed(1)},${H} Z`;
   const best = summary.days[0] && summary.days[0].best;
   const bx = best ? X(best.t) : 0;
   const by = best ? Y(best.height) : 0;
   const nx = Math.max(0, Math.min(W, summary.nowFrac * W));
   const ny = summary.now.height != null ? Y(summary.now.height) : null;
-  const labelEnd = bx > W - 76;
-  return html`<div class="surf-hero__chart" ref=${ref}>
+  // The label sits above the flag, kept inside the chart.
+  const lx = Math.max(34, Math.min(W - 34, bx));
+  return html`<div class="sea__chart" ref=${ref}>
     <svg viewBox=${`0 0 ${W} ${H}`} width=${W} height=${H} role="img" aria-label=${`Swell today, ${best ? `best around ${summary.days[0].bestLabel}` : 'no daylight session left'}`}>
-      <defs>
-        <linearGradient id="swell-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#fff" stop-opacity="0.22" />
-          <stop offset="1" stop-color="#fff" stop-opacity="0" />
-        </linearGradient>
-      </defs>
-      <path d=${area} fill="url(#swell-fill)" />
-      <path d=${line} fill="none" stroke="rgba(255,255,255,0.92)" stroke-width="1.6" stroke-linejoin="round" />
+      ${[6, 12, 18].map((h) => html`<line key=${h} x1=${(h / 24) * W} x2=${(h / 24) * W} y1="0" y2=${H} stroke="var(--sea-line)" stroke-dasharray="2 4" />`)}
+      <line x1="0" x2=${W} y1=${H - 0.5} y2=${H - 0.5} stroke="var(--sea-line)" />
+      <path d=${line} fill="none" stroke="var(--sea-ink)" stroke-width="1.5" stroke-linejoin="round" />
       ${best && html`<g>
-        <line x1=${bx} x2=${bx} y1=${by} y2=${H} stroke="rgba(255,255,255,0.55)" />
-        <line x1=${bx} x2=${bx} y1=${by - 24} y2=${by} stroke="#fff" stroke-width="1.2" />
-        <path d=${`M${bx},${by - 24} l9,3.5 l-9,3.5 Z`} fill="#fff" />
-        <circle cx=${bx} cy=${by} r="3.2" fill="#fff" />
-        <text class="surf-hero__flag" x=${labelEnd ? bx - 6 : bx + 13} y=${by - 15} text-anchor=${labelEnd ? 'end' : 'start'}>BEST ${summary.days[0].bestLabel}</text>
+        <line x1=${bx} x2=${bx} y1=${by - 26} y2=${H} stroke="var(--accent)" stroke-width="1.2" />
+        <path d=${`M${bx},${by - 26} l11,4 l-11,4 Z`} fill="var(--accent)" />
+        <text class="sea__flag" x=${lx} y=${by - 32} text-anchor="middle">Best ${summary.days[0].bestLabel}</text>
       </g>`}
-      ${ny != null && html`<circle cx=${nx} cy=${ny} r="4" fill="#fff" stroke="rgba(255,255,255,0.35)" stroke-width="6" />`}
+      ${ny != null && html`<rect x=${nx - 3.5} y=${ny - 3.5} width="7" height="7" fill="var(--sea)" stroke="var(--sea-ink)" stroke-width="1.5" />`}
     </svg>
-    <div class="surf-hero__axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+    <div class="sea__axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
   </div>`;
 }
 
 export function SurfHero({ settings, link = false }) {
   const spot = settings.surf;
   const { summary, loading } = useSurf(spot);
-  const sky = `surf-hero surf-hero--${skyAt(new Date().getHours())}${link ? ' tile-btn' : ''}`;
+  const cls = `sea${link ? ' tile-btn' : ''}`;
   const Tag = link ? 'a' : 'div';
   if (!summary) {
-    return html`<${Tag} class=${sky} href=${link ? '#/life' : undefined}>
-      <div class="surf-hero__label">Surf · ${spot.name || 'your spot'}</div>
-      <div class="surf-hero__sub" style="margin-top:auto">${loading ? 'Loading the forecast' : 'Forecast unavailable right now'}</div>
+    return html`<${Tag} class=${cls} href=${link ? '#/life' : undefined}>
+      <div class="sea__label">Surf · ${spot.name || 'your spot'}</div>
+      <div class="sea__sub" style="margin-top:auto">${loading ? 'Loading the forecast' : 'Forecast unavailable right now'}</div>
     </${Tag}>`;
   }
   const n = summary.now;
-  return html`<${Tag} class=${sky} href=${link ? '#/life' : undefined} aria-label=${link ? `Surf at ${spot.name}: ${fmtM(n.height)} metres, ${SCORE_LABEL[n.score]}. Open Life` : undefined}>
-    <div class="surf-hero__top">
+  return html`<${Tag} class=${cls} href=${link ? '#/life' : undefined} aria-label=${link ? `Surf at ${spot.name}: ${fmtM(n.height)} metres, ${SCORE_LABEL[n.score]}. Open Life` : undefined}>
+    <div class="sea__top">
       <div>
-        <div class="surf-hero__label">Surf · ${spot.name || 'your spot'}</div>
-        <div class="surf-hero__big">${fmtM(n.height)}<span class="surf-hero__unit">m</span></div>
-        <div class="surf-hero__sub">${fmtS(n.period)} s from ${compass(n.dir)}${n.wind != null ? ` · wind ${Math.round(n.wind)} km/h${n.rel ? ` ${n.rel}` : ''}` : ''}</div>
+        <div class="sea__label">Surf · ${spot.name || 'your spot'}</div>
+        <div class="sea__big">${fmtM(n.height)}<span class="sea__unit">m</span></div>
+        <div class="sea__sub">${fmtS(n.period)} s from ${compass(n.dir)}${n.wind != null ? `, wind ${Math.round(n.wind)} km/h${n.rel ? ` ${n.rel}` : ''}` : ''}</div>
       </div>
-      <span class="surf-hero__pill">${SCORE_LABEL[n.score]}</span>
+      <span class=${'sea__rating' + (n.score >= 3 ? ' sea__rating--good' : '')}>${SCORE_LABEL[n.score]}</span>
     </div>
     <${DayChart} summary=${summary} />
   </${Tag}>`;
 }
-
 export function SurfCard({ settings, onSettings }) {
   const spot = settings.surf;
   const { loading, summary, error, fc, refresh } = useSurf(spot);
@@ -182,7 +171,7 @@ export function SurfCard({ settings, onSettings }) {
           <${Quality} score=${d.best ? d.best.score : 0} />
         </div>`)}
       </div>
-      <p class="surf-note" style="padding-top:12px">${fc && fc.sample ? 'Sample forecast for the preview. ' : ''}Rough guide from swell height, period and wind direction for a beach facing ${compass(Number(spot.facing))}. Data from Open-Meteo, ${fmtAgo(fc && fc.cachedAt)}.${fc && fc.stale ? ' Offline copy.' : ''} ${onSettings ? html`<button class="link-btn" style="font-size:12px" onClick=${onSettings}>Change spot</button>` : ''}</p>
+      <p class="surf-note" style="padding-top:12px">Rough guide from swell height, period and wind direction for a beach facing ${compass(Number(spot.facing))}. Data from Open-Meteo, ${fmtAgo(fc && fc.cachedAt)}.${fc && fc.stale ? ' Offline copy.' : ''} ${onSettings ? html`<button class="link-btn" style="font-size:12px" onClick=${onSettings}>Change spot</button>` : ''}</p>
     </div>
   </${Section}>`;
 }

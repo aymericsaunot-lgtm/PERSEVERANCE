@@ -41,21 +41,13 @@ const dayOf = (ms) => isoOf(new Date(ms));
 const zero = () => [0, 0, 0, 0];
 const sum = (row) => (row ? row[0] + row[1] + row[2] + row[3] : 0);
 
-export function roman(n) {
-  const map = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
-  let out = '';
-  let v = Math.max(1, Math.floor(n));
-  for (const [k, s] of map) while (v >= k) { out += s; v -= k; }
-  return out;
-}
-
 // Level L to L+1 takes 100 + 50 L XP: level 2 after a good day, level 10 after about six weeks.
 export function levelInfo(xp) {
   let level = 1;
   let floor = 0;
   let step = 150;
   while (xp >= floor + step) { floor += step; level++; step = 100 + 50 * level; }
-  return { level, mark: roman(level), floor, next: floor + step, into: xp - floor, step, pct: Math.max(0, Math.min(1, (xp - floor) / step)) };
+  return { level, floor, next: floor + step, into: xp - floor, step, pct: Math.max(0, Math.min(1, (xp - floor) / step)) };
 }
 
 export function attrLevel(xp) {

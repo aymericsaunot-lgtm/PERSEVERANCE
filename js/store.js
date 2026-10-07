@@ -1,8 +1,8 @@
-// App state. Backends (Firebase or demo) push documents in; views read and call actions.
+// App state. The Firebase backend pushes documents in; views read and call actions.
 import { useEffect, useState, useRef } from '../vendor/preact.js';
 import { uid } from './lib/text.js';
 
-export const COLLECTIONS = ['tasks', 'papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'sessions', 'habits', 'memories'];
+export const COLLECTIONS = ['tasks', 'papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'sessions', 'habits'];
 
 export const DEFAULT_SETTINGS = {
   taskAreas: ['PhD', 'EigenMode', 'Freelance', 'Games', 'Life'],
@@ -13,18 +13,15 @@ export const DEFAULT_SETTINGS = {
   facilities: ['BESSY II', 'MAX IV', 'Diamond', 'Elettra', 'SOLEIL', 'ALBA', 'SLS', 'PETRA III', 'ESRF'],
   surf: { name: 'Hendaye', lat: 43.375, lon: -1.772, facing: 340 },
   thesis: { title: 'PhD thesis', target: '' },
-  profile: { name: '', about: '' },
-  jarvis: { briefing: true, depth: 'low' },
   xpGoal: 100,
 };
 
 const state = {
   data: {
-    tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [], memories: [],
+    tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [],
     settings: DEFAULT_SETTINGS,
     arxivStatus: null,
     progress: null,
-    briefing: null,
   },
   loaded: new Set(),
   status: { mode: null, sync: 'synced', error: null, user: null },
@@ -83,8 +80,6 @@ export function setSettingsDoc(doc) {
       ...d,
       surf: { ...DEFAULT_SETTINGS.surf, ...(d.surf || {}) },
       thesis: { ...DEFAULT_SETTINGS.thesis, ...(d.thesis || {}) },
-      profile: { ...DEFAULT_SETTINGS.profile, ...(d.profile || {}) },
-      jarvis: { ...DEFAULT_SETTINGS.jarvis, ...(d.jarvis || {}) },
     },
   };
   state.loaded.add('settings');
@@ -96,9 +91,9 @@ export function setArxivStatus(doc) {
   notify();
 }
 
-// The other documents in meta: progress (frozen XP days) and today's Jarvis briefing.
-export function setMetaDocs({ progress, briefing }) {
-  state.data = { ...state.data, progress: progress || null, briefing: briefing || null };
+// meta/progress: XP of finished days, frozen (see lib/xp.js).
+export function setMetaDocs({ progress }) {
+  state.data = { ...state.data, progress: progress || null };
   notify();
 }
 
@@ -113,7 +108,7 @@ export function setStatus(patch) {
 }
 
 export function resetData() {
-  state.data = { ...state.data, tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [], memories: [], settings: DEFAULT_SETTINGS, arxivStatus: null, progress: null, briefing: null };
+  state.data = { ...state.data, tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [], settings: DEFAULT_SETTINGS, arxivStatus: null, progress: null };
   state.loaded = new Set();
   notify();
 }
@@ -147,7 +142,7 @@ export const actions = {
   saveSettings(patch) {
     backend.saveSettings(clean(patch));
   },
-  // Merge into meta/{id}: 'progress' or 'briefing'.
+  // Merge into meta/{id}, e.g. 'progress'.
   saveMeta(id, patch) {
     backend.saveMeta(id, clean(patch));
   },

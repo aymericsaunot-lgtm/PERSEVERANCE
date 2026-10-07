@@ -53,7 +53,7 @@ export function Histogram({ counts }) {
     ${counts.map((c, i) => {
       const h = c ? Math.max(4, (c / max) * (H - 2)) : 2;
       return html`<rect key=${i} x=${i * (bw + gap)} y=${H - h} width=${bw} height=${h} rx="2"
-        fill=${c ? 'var(--accent)' : 'var(--surface-3)'} opacity=${c ? (i === n - 1 ? 1 : 0.42) : 1} />`;
+        fill=${c ? (i === n - 1 ? 'var(--accent)' : 'var(--ink)') : 'var(--surface-3)'} />`;
     })}
   </svg>`;
 }

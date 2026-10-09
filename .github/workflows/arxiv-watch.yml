@@ -1,0 +1,26 @@
+name: arXiv watch
+
+# Weekday mornings, shortly after arXiv publishes the new listings (times are UTC).
+on:
+  schedule:
+    - cron: "23 5 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet -r scripts/requirements.txt
+      - name: Check arXiv
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          DASHBOARD_UID: ${{ secrets.DASHBOARD_UID }}
+        run: .venv/bin/python scripts/arxiv_watch.py

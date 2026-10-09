@@ -1,4 +1,5 @@
-// Entry point: Firebase sign-in, then the app shell. There is no way in without your password.
+// Entry point: Firebase sign-in, then the space of whoever signed in: Research or Studio.
+// There is no way in without a password, and each account only ever sees its own data.
 import { html, render, useState, useEffect } from '../vendor/preact.js';
 import { config } from '../config.js';
 import { attachBackend, getBackend, setStatus, useStore, getState, dataReady, actions } from './store.js';
@@ -11,10 +12,21 @@ import { LifeView } from './views/life.js';
 import { SettingsView, applyTheme, getTheme } from './views/settings.js';
 import { LoginView, SetupView } from './views/login.js';
 import { ProgressView, SideLevel, LevelUp } from './views/progress.js';
+import { StudioShell, EditionChooser } from './views/studio/shell.js';
 import { progressOf, archivePatch } from './lib/xp.js';
 import { todayISO } from './lib/dates.js';
 
+const EDITION_KEY = 'dash.edition';
+const cachedEdition = () => { try { return localStorage.getItem(EDITION_KEY) || ''; } catch (e) { return ''; } };
+function showEdition(edition) {
+  document.documentElement.dataset.edition = edition;
+  try { localStorage.setItem(EDITION_KEY, edition); } catch (e) { /* ignore */ }
+  if (edition === 'studio') document.querySelectorAll('meta[name="theme-color"]').forEach((m) => m.setAttribute('content', '#F8F8F4'));
+  else applyTheme(getTheme());
+}
+
 applyTheme(getTheme());
+document.documentElement.dataset.edition = cachedEdition() || 'research';
 
 const NAV = [
   { id: 'today', label: 'Today', icon: 'today' },
@@ -74,6 +86,19 @@ function SyncBadge({ status }) {
   return html`<span class=${'sync sync--' + status.sync} title="Sync status"><span class="sync__dot"></span>${label}</span>`;
 }
 
+// Everything has arrived and is confirmed by the server (or we are offline with what we have).
+const settled = (state) => dataReady(state) && state.status.sync !== 'connecting';
+const RESEARCH_DATA = ['tasks', 'papers', 'arxiv', 'habits', 'sessions', 'beamtimes', 'deadlines', 'chapters'];
+
+// Which space to show. An account that never chose gets Research if it already holds data
+// (the original owner) and the chooser if it is brand new.
+function pickEdition(state) {
+  const saved = state.data.settings.edition;
+  if (saved === 'studio' || saved === 'research') return saved;
+  if (!settled(state)) return cachedEdition() || 'wait';
+  return RESEARCH_DATA.some((c) => state.data[c].length) ? 'research' : 'choose';
+}
+
 // Level-ups seen on this device, and freezing finished days into meta/progress.
 function useProgressKeeping(state, p) {
   const [levelUp, setLevelUp] = useState(0);
@@ -81,7 +106,7 @@ function useProgressKeeping(state, p) {
   const today = todayISO();
   useEffect(() => {
     if (!ready) return;
-    const key = 'dash.level.best';
+    const key = `dash.level.best.${state.status.user ? state.status.user.uid : 'me'}`;
     let best = 0;
     try { best = Number(localStorage.getItem(key)) || 0; } catch (e) { /* storage unavailable */ }
     if (p.level <= best) return;
@@ -96,18 +121,12 @@ function useProgressKeeping(state, p) {
   return [levelUp, () => setLevelUp(0)];
 }
 
-function Shell({ state, onSignOut }) {
-  const route = useRoute();
+function Shell({ state, p, route, install, onSignOut }) {
   const [main, sub] = route.split('/');
-  const p = progressOf(state.data);
-  const [levelUp, closeLevelUp] = useProgressKeeping(state, p);
   const counts = {
     tasks: todayTasks(state.data.tasks).length,
     papers: state.data.arxiv.filter((x) => x.status === 'new').length,
   };
-  const install = state.status.canInstall && installEvent
-    ? async () => { installEvent.prompt(); await installEvent.userChoice; installEvent = null; setStatus({ canInstall: false }); }
-    : null;
 
   let view;
   if (main === 'tasks') view = html`<${TasksView} state=${state} go=${go} />`;
@@ -147,9 +166,30 @@ function Shell({ state, onSignOut }) {
         ${n.label}
       </button>`)}
     </nav>
-    ${levelUp > 0 && html`<${LevelUp} level=${levelUp} onClose=${closeLevelUp} />`}
   </div>`;
 }
+
+// The signed-in app: the right space, plus what both spaces share.
+function Space({ state, edition, onSignOut }) {
+  const route = useRoute();
+  const p = progressOf(state.data);
+  const [levelUp, closeLevelUp] = useProgressKeeping(state, p);
+  useEffect(() => { showEdition(edition); }, [edition]);
+  // The original account had no space saved: record Research once its data has arrived.
+  useEffect(() => {
+    if (!state.data.settings.edition && edition === 'research' && settled(state)) actions.saveSettings({ edition: 'research' });
+  }, [edition, settled(state)]);
+  const install = state.status.canInstall && installEvent
+    ? async () => { installEvent.prompt(); await installEvent.userChoice; installEvent = null; setStatus({ canInstall: false }); }
+    : null;
+  return html`
+    ${edition === 'studio'
+      ? html`<${StudioShell} state=${state} p=${p} route=${route} go=${go} install=${install} onSignOut=${onSignOut} />`
+      : html`<${Shell} state=${state} p=${p} route=${route} install=${install} onSignOut=${onSignOut} />`}
+    ${levelUp > 0 && html`<${LevelUp} level=${levelUp} onClose=${closeLevelUp} />`}`;
+}
+
+const STUDIO_START = { edition: 'studio', taskAreas: ['Clients', 'Studio', 'Admin', 'Life'], sportTypes: ['Boxing', 'Run', 'Gym', 'Yoga'] };
 
 let describeErrorFn = (e) => (e && e.message) || 'Something went wrong.';
 
@@ -186,8 +226,12 @@ function App() {
     go('today');
   };
   let body;
-  if (phase === 'ready') body = html`<${Shell} state=${state} onSignOut=${onSignOut} />`;
-  else if (phase === 'login') body = html`<${LoginView} backend=${getBackend()} describeError=${describeErrorFn} />`;
+  if (phase === 'ready') {
+    const edition = pickEdition(state);
+    if (edition === 'choose') body = html`<${EditionChooser} onPick=${(e) => actions.saveSettings(e === 'studio' ? STUDIO_START : { edition: 'research' })} />`;
+    else if (edition === 'wait') body = html`<div class="splash" aria-busy="true"><${Mark} size=${40} /></div>`;
+    else body = html`<${Space} state=${state} edition=${edition} onSignOut=${onSignOut} />`;
+  } else if (phase === 'login') body = html`<${LoginView} backend=${getBackend()} describeError=${describeErrorFn} />`;
   else if (phase === 'setup') body = html`<${SetupView} />`;
   else if (phase === 'error') body = html`<div class="splash"><p>Could not start: ${state.status.error}</p></div>`;
   else body = html`<div class="splash" aria-busy="true"><${Mark} size=${40} /></div>`;

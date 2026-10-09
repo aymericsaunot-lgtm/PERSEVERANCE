@@ -69,7 +69,8 @@ export function createFirebaseBackend(config, { onError }) {
     listen('tasks-open', query(userCol('tasks'), where('done', '==', false)), (docs) => { open = docs; pushTasks(); });
     listen('tasks-done', query(userCol('tasks'), where('doneAt', '>=', doneCutoff)), (docs) => { done = docs; pushTasks(); });
     listen('sessions', query(userCol('sessions'), where('date', '>=', sessionCutoff)), (docs) => setDocs('sessions', docs));
-    for (const name of ['papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'habits']) {
+    listen('timelogs', query(userCol('timelogs'), where('date', '>=', sessionCutoff)), (docs) => setDocs('timelogs', docs));
+    for (const name of ['papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'habits', 'projects', 'clients', 'invoices']) {
       listen(name, userCol(name), (docs) => setDocs(name, docs));
     }
     listen('meta', userCol('meta'), (docs) => {

@@ -52,6 +52,12 @@ const PATHS = {
   key: '<circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 8.7-8.7"/><path d="m16.5 6 2.5 2.5"/><path d="m14 8.5 2 2"/>',
   memory: '<path d="M9.5 4.5A3 3 0 0 0 6.6 7 3 3 0 0 0 4.5 12a3 3 0 0 0 2.1 4.6 3 3 0 0 0 5.4 1.2V6.2a3 3 0 0 0-2.5-1.7z"/><path d="M14.5 4.5A3 3 0 0 1 17.4 7a3 3 0 0 1 2.1 5 3 3 0 0 1-2.1 4.6 3 3 0 0 1-5.4 1.2"/>',
   sparkle: '<path d="M12 3.5c.6 4.4 2.1 5.9 6.5 6.5-4.4.6-5.9 2.1-6.5 6.5-.6-4.4-2.1-5.9-6.5-6.5 4.4-.6 5.9-2.1 6.5-6.5z"/><path d="M18.5 15.5c.3 1.6.9 2.2 2.5 2.5-1.6.3-2.2.9-2.5 2.5-.3-1.6-.9-2.2-2.5-2.5 1.6-.3 2.2-.9 2.5-2.5z"/>',
+  arrowUpRight: '<path d="M7 17 17 7"/><path d="M8.5 7H17v8.5"/>',
+  projects: '<rect x="3.5" y="4" width="7" height="7" rx="1.5"/><rect x="13.5" y="4" width="7" height="7" rx="1.5"/><rect x="3.5" y="14" width="7" height="6" rx="1.5"/><rect x="13.5" y="14" width="7" height="6" rx="1.5"/>',
+  clients: '<circle cx="9" cy="8.5" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M15.5 5a3.5 3.5 0 0 1 0 7"/><path d="M18 14.5a6 6 0 0 1 3.5 5.5"/>',
+  money: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 9.5v5M18 9.5v5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/>',
+  glove: '<path d="M7.5 11.5V8a4.5 4.5 0 0 1 4.5-4.5h1A4.5 4.5 0 0 1 17.5 8v5.5a5 5 0 0 1-5 5H12a4.5 4.5 0 0 1-4.5-4.5z"/><path d="M7.5 11.5H11a2 2 0 0 1 0 4H8.5"/><path d="M9 18.5V21h7.5v-3"/>',
 };
 
 export function Icon({ name, size, cls = '', label }) {

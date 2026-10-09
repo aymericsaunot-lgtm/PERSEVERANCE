@@ -3,7 +3,6 @@
 import { html, useState, useEffect } from '../../vendor/preact.js';
 import { actions } from '../store.js';
 import { Rich, Section, Sheet, PageHead, Empty, useWidth } from '../ui.js';
-import { RULES } from '../lib/xp.js';
 import { todayISO, daysBetween, fmtDate, fmtShort, parseISO } from '../lib/dates.js';
 
 const fmt = (n) => Math.round(n).toLocaleString('en-GB');
@@ -118,14 +117,17 @@ function WeekChart({ weeks }) {
   </div>`;
 }
 
-const KIND = { task: 'Task', deadline: 'Deadline', beamtime: 'Beamtime', thesis: 'Thesis', paper: 'Paper read', sport: 'Sport', habit: 'Habit', bonus: 'Bonus' };
+const KIND = {
+  task: 'Task', deadline: 'Deadline', beamtime: 'Beamtime', thesis: 'Thesis', paper: 'Paper read', sport: 'Sport', habit: 'Habit', bonus: 'Bonus',
+  project: 'Project delivered', time: 'Hours', client: 'New client', quote: 'Quote accepted', sent: 'Invoice sent', paid: 'Invoice paid',
+};
 
 function whenLabel(day) {
   const n = daysBetween(day, todayISO());
   return n === 0 ? 'today' : n === 1 ? 'yesterday' : n < 7 ? parseISO(day).toLocaleDateString('en-GB', { weekday: 'long' }) : fmtDate(day);
 }
 
-function RulesSheet({ goal, onClose }) {
+function RulesSheet({ goal, rules, onClose }) {
   const [value, setValue] = useState(goal);
   const presets = [60, 100, 150, 200];
   const save = () => {
@@ -136,9 +138,9 @@ function RulesSheet({ goal, onClose }) {
   return html`<${Sheet} title="How XP works" onClose=${onClose} actions=${html`<button class="btn btn--primary" onClick=${save}>Done</button>`}>
     <p class="muted" style="margin-bottom:12px">XP comes from what you already log, so there is nothing to track twice. Undoing something takes its XP back.</p>
     <div class="rules">
-      ${RULES.map(([what, xp, attr]) => html`<div key=${what} class="rules__row"><span class=${'spot-dot spot--' + attr}></span><span>${what}</span><span>${xp}</span></div>`)}
+      ${rules.map(([what, xp, attr]) => html`<div key=${what} class="rules__row"><span class=${'spot-dot spot--' + attr}></span><span>${what}</span><span>${xp}</span></div>`)}
     </div>
-    <p class="field__hint" style="margin-top:12px">Work, Mind, Body and Discipline each have their own level, so you can see what you have been neglecting.</p>
+    <p class="field__hint" style="margin-top:12px">Each of the four attributes has its own level, so you can see what you have been neglecting.</p>
     <div class="field" style="margin-top:20px">
       <span class="field__label">Daily goal</span>
       <div class="chips">
@@ -201,7 +203,7 @@ export function ProgressView({ state, p }) {
         </div>
       </${Section}>
     </div>
-    ${rules && html`<${RulesSheet} goal=${p.goal} onClose=${() => setRules(false)} />`}
+    ${rules && html`<${RulesSheet} goal=${p.goal} rules=${p.rules} onClose=${() => setRules(false)} />`}
   </div>`;
 }
 

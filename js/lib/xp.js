@@ -1,15 +1,26 @@
-// Level system. XP comes from what you already log (finished tasks, papers read, habits,
-// sport, thesis progress), so there is nothing extra to track and old data counts too.
-// Finished tasks only stay synced for 30 days, so days older than a week are frozen
-// into meta/progress and read back from there.
+// Level system. XP comes from what you already log (finished tasks, papers read, delivered
+// projects, paid invoices, habits, sport...), so there is nothing extra to track and old data
+// counts too. Finished tasks only stay synced for 30 days, so days older than a week are
+// frozen into meta/progress and read back from there.
 import { todayISO, addDays, isoOf, startOfWeek, parseISO } from './dates.js';
 
-export const ATTRS = [
-  { id: 'work', label: 'Work', from: 'Tasks, deadlines, beamtimes and thesis progress' },
-  { id: 'mind', label: 'Mind', from: 'Papers read' },
-  { id: 'body', label: 'Body', from: 'Sport sessions' },
-  { id: 'discipline', label: 'Discipline', from: 'Habits' },
-];
+// Four attribute slots; each space names them after what feeds them.
+const LABELS = {
+  research: [
+    ['work', 'Work', 'Tasks, deadlines, beamtimes and thesis progress'],
+    ['mind', 'Mind', 'Papers read'],
+    ['body', 'Body', 'Sport sessions'],
+    ['discipline', 'Discipline', 'Habits'],
+  ],
+  studio: [
+    ['work', 'Craft', 'Tasks, hours on projects and delivered projects'],
+    ['mind', 'Business', 'New clients, quotes accepted, invoices sent and paid'],
+    ['body', 'Body', 'Sport sessions'],
+    ['discipline', 'Discipline', 'Habits'],
+  ],
+};
+export const attrsFor = (edition) => (LABELS[edition] || LABELS.research).map(([id, label, from]) => ({ id, label, from }));
+export const ATTRS = attrsFor('research');
 const SLOT = { work: 0, mind: 1, body: 2, discipline: 3 };
 
 export const XP = {
@@ -21,21 +32,42 @@ export const XP = {
   habit: 10,
   allHabits: 20,
   thesisPoint: 6,
+  project: 80,
+  client: 20,
+  quote: 30,
+  invoiceSent: 10,
+  invoicePaid: 40,
 };
 
 // One XP per two minutes of sport, at most 60 per session.
 export const sportXP = (minutes) => Math.max(0, Math.min(60, Math.round((Number(minutes) || 0) / 2)));
+// Ten XP per hour on a project, at most 80 per entry.
+export const timeXP = (minutes) => Math.max(0, Math.min(80, Math.round((Number(minutes) || 0) / 6)));
 
-export const RULES = [
-  ['Task done', `${XP.task} XP, starred ${XP.starredTask}`, 'work'],
-  ['Deadline submitted', `${XP.deadline} XP`, 'work'],
-  ['Beamtime completed', `${XP.beamtime} XP`, 'work'],
-  ['Thesis progress', `${XP.thesisPoint} XP per chapter point`, 'work'],
-  ['Paper read', `${XP.paper} XP`, 'mind'],
-  ['Sport', '1 XP per 2 minutes, up to 60', 'body'],
-  ['Habit ticked', `${XP.habit} XP`, 'discipline'],
-  ['Every habit in a day', `${XP.allHabits} XP bonus`, 'discipline'],
-];
+const RULES_BY = {
+  research: [
+    ['Task done', `${XP.task} XP, starred ${XP.starredTask}`, 'work'],
+    ['Deadline submitted', `${XP.deadline} XP`, 'work'],
+    ['Beamtime completed', `${XP.beamtime} XP`, 'work'],
+    ['Thesis progress', `${XP.thesisPoint} XP per chapter point`, 'work'],
+    ['Paper read', `${XP.paper} XP`, 'mind'],
+    ['Sport', '1 XP per 2 minutes, up to 60', 'body'],
+    ['Habit ticked', `${XP.habit} XP`, 'discipline'],
+    ['Every habit in a day', `${XP.allHabits} XP bonus`, 'discipline'],
+  ],
+  studio: [
+    ['Task done', `${XP.task} XP, starred ${XP.starredTask}`, 'work'],
+    ['Hours on a project', '10 XP an hour, up to 80 an entry', 'work'],
+    ['Project delivered', `${XP.project} XP`, 'work'],
+    ['New client', `${XP.client} XP`, 'mind'],
+    ['Quote accepted', `${XP.quote} XP`, 'mind'],
+    ['Invoice sent, then paid', `${XP.invoiceSent} XP, then ${XP.invoicePaid}`, 'mind'],
+    ['Sport', '1 XP per 2 minutes, up to 60', 'body'],
+    ['Habit ticked', `${XP.habit} XP, ${XP.allHabits} bonus for all of them`, 'discipline'],
+  ],
+};
+export const rulesFor = (edition) => RULES_BY[edition] || RULES_BY.research;
+export const RULES = RULES_BY.research;
 
 const dayOf = (ms) => isoOf(new Date(ms));
 const zero = () => [0, 0, 0, 0];
@@ -92,6 +124,22 @@ export function xpEvents(data, today = todayISO()) {
     if (p.status === 'read' && p.readAt) push(dayOf(p.readAt), 'mind', XP.paper, p.title, 'paper', p.readAt);
   }
   for (const s of data.sessions) push(s.date, 'body', sportXP(s.minutes), `${s.type}, ${s.minutes} min`, 'sport', s.createdAt || 0);
+
+  // Studio
+  const projects = data.projects || [];
+  const title = new Map(projects.map((p) => [p.id, p.title]));
+  for (const p of projects) if (p.stage === 'done' && p.doneAt) push(dayOf(p.doneAt), 'work', XP.project, p.title, 'project', p.doneAt);
+  for (const t of data.timelogs || []) push(t.date, 'work', timeXP(t.minutes), `${title.get(t.projectId) || 'Studio time'}, ${Math.round((t.minutes / 60) * 10) / 10} h`, 'time', t.createdAt || 0);
+  for (const c of data.clients || []) if (c.createdAt) push(dayOf(c.createdAt), 'mind', XP.client, c.name, 'client', c.createdAt);
+  for (const inv of data.invoices || []) {
+    const label = `${inv.number || (inv.kind === 'quote' ? 'Quote' : 'Invoice')}${title.get(inv.projectId) ? `, ${title.get(inv.projectId)}` : ''}`;
+    if (inv.kind === 'quote') {
+      if (inv.acceptedAt) push(dayOf(inv.acceptedAt), 'mind', XP.quote, label, 'quote', inv.acceptedAt);
+    } else {
+      if (inv.sentAt) push(dayOf(inv.sentAt), 'mind', XP.invoiceSent, label, 'sent', inv.sentAt);
+      if (inv.paidAt) push(dayOf(inv.paidAt), 'mind', XP.invoicePaid, label, 'paid', inv.paidAt);
+    }
+  }
 
   const active = data.habits.filter((h) => !h.archived);
   const perDay = new Map();
@@ -196,7 +244,8 @@ function computeProgress(data, today) {
     lastWeekXP,
     weeks,
     goalStreak,
-    attrs: ATTRS.map((a, i) => ({ ...a, xp: Math.max(0, totals[i]), week: Math.max(0, weekAttr[i]), ...attrLevel(totals[i]) })),
+    attrs: attrsFor(data.settings.edition).map((a, i) => ({ ...a, xp: Math.max(0, totals[i]), week: Math.max(0, weekAttr[i]), ...attrLevel(totals[i]) })),
+    rules: rulesFor(data.settings.edition),
     recent,
   };
 }

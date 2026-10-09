@@ -2,7 +2,8 @@
 import { useEffect, useState, useRef } from '../vendor/preact.js';
 import { uid } from './lib/text.js';
 
-export const COLLECTIONS = ['tasks', 'papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'sessions', 'habits'];
+// The last four belong to the Studio space; a Research account simply has none.
+export const COLLECTIONS = ['tasks', 'papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'sessions', 'habits', 'projects', 'clients', 'invoices', 'timelogs'];
 
 export const DEFAULT_SETTINGS = {
   taskAreas: ['PhD', 'EigenMode', 'Freelance', 'Games', 'Life'],
@@ -14,11 +15,16 @@ export const DEFAULT_SETTINGS = {
   surf: { name: 'Hendaye', lat: 43.375, lon: -1.772, facing: 340 },
   thesis: { title: 'PhD thesis', target: '' },
   xpGoal: 100,
+  // Studio. `edition` itself has no default: an account without one is decided on first sign-in.
+  currency: 'EUR',
+  paymentDays: 30,
+  projectTypes: ['Branding', 'Logo', 'UI/UX', 'Web', 'Social media', 'Print', 'Packaging', 'Illustration'],
 };
 
 const state = {
   data: {
     tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [],
+    projects: [], clients: [], invoices: [], timelogs: [],
     settings: DEFAULT_SETTINGS,
     arxivStatus: null,
     progress: null,
@@ -108,7 +114,7 @@ export function setStatus(patch) {
 }
 
 export function resetData() {
-  state.data = { ...state.data, tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [], settings: DEFAULT_SETTINGS, arxivStatus: null, progress: null };
+  state.data = { ...state.data, tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [], projects: [], clients: [], invoices: [], timelogs: [], settings: DEFAULT_SETTINGS, arxivStatus: null, progress: null };
   state.loaded = new Set();
   notify();
 }

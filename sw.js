@@ -1,5 +1,5 @@
 // Offline cache. Bump VERSION whenever you change any file, so installed apps update.
-const VERSION = '2026.10.07';
+const VERSION = '2026.10.09';
 const CACHE = `dashboard-${VERSION}`;
 
 const SHELL = [
@@ -8,6 +8,7 @@ const SHELL = [
   './config.js',
   './manifest.webmanifest',
   './css/app.css',
+  './css/studio.css',
   './vendor/preact.js',
   './vendor/firebase.js',
   './js/main.js',
@@ -25,6 +26,13 @@ const SHELL = [
   './js/views/papers.js',
   './js/views/phd.js',
   './js/views/progress.js',
+  './js/views/studio/clients.js',
+  './js/views/studio/common.js',
+  './js/views/studio/money.js',
+  './js/views/studio/projects.js',
+  './js/views/studio/sheets.js',
+  './js/views/studio/shell.js',
+  './js/views/studio/today.js',
   './js/views/settings.js',
   './js/views/tasks.js',
   './js/views/today.js',
@@ -34,6 +42,12 @@ const SHELL = [
   './fonts/instrument-serif-italic-latin-ext.woff2',
   './fonts/instrument-sans-normal-latin.woff2',
   './fonts/instrument-sans-normal-latin-ext.woff2',
+  './fonts/schibsted-normal-latin.woff2',
+  './fonts/schibsted-normal-latin-ext.woff2',
+  './fonts/schibsted-italic-latin.woff2',
+  './fonts/schibsted-italic-latin-ext.woff2',
+  './fonts/dmmono-400-latin.woff2',
+  './fonts/dmmono-500-latin.woff2',
   './fonts/stix-latin-400.woff2',
   './fonts/stix-latin-400-italic.woff2',
   './fonts/stix-latin-500.woff2',

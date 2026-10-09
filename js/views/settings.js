@@ -77,6 +77,7 @@ export function SettingsView({ state, sub, install, onSignOut }) {
   const [theme, setTheme] = useState(getTheme());
   const fileRef = useRef(null);
   const save = (k) => (v) => actions.saveSettings({ [k]: v });
+  const studio = s.edition === 'studio';
   useEffect(() => {
     const el = sub && document.getElementById(sub);
     if (el) el.scrollIntoView({ block: 'start' });
@@ -134,10 +135,31 @@ export function SettingsView({ state, sub, install, onSignOut }) {
             </div>
           </div>
         </${Section}>
+        <${Section} title="Space">
+          <div class="group group--pad">
+            <${Segmented} label="Space" value=${studio ? 'studio' : 'research'} onChange=${(e) => actions.saveSettings({ edition: e })} items=${[{ id: 'research', label: 'Research' }, { id: 'studio', label: 'Studio' }]} />
+            <p class="field__hint" style="margin-top:10px">Research is for the PhD, papers and surf; Studio is for design work, clients and invoices. This changes only what this account shows; its data stays.</p>
+          </div>
+        </${Section}>
         <${Section} title="Task areas">
           <div class="group group--pad"><${TagEditor} plain=${true} value=${s.taskAreas || []} onChange=${save('taskAreas')} placeholder="Add an area" /></div>
         </${Section}>
-        <${Section} title="Paper tags">
+        ${studio && html`<${Section} title="Projects and invoices">
+          <div class="group group--pad">
+            <div class="fields-2">
+              <${Field} label="Currency">
+                <select class="select" value=${s.currency || 'EUR'} onChange=${(e) => actions.saveSettings({ currency: e.currentTarget.value })}>
+                  ${['EUR', 'GBP', 'USD', 'CHF', 'CAD', 'AUD'].map((c) => html`<option key=${c} value=${c}>${c}</option>`)}
+                </select>
+              </${Field}>
+              <${Field} label="Payment terms (days)">
+                <input class="input" inputmode="numeric" value=${s.paymentDays || 30} onChange=${(e) => { const n = Math.round(Number(e.currentTarget.value)); if (n > 0 && n < 366) actions.saveSettings({ paymentDays: n }); }} />
+              </${Field}>
+            </div>
+            <div class="field" style="margin-top:15px"><span class="field__label">Project types</span><${TagEditor} plain=${true} value=${s.projectTypes || []} onChange=${save('projectTypes')} placeholder="Add a type" /></div>
+          </div>
+        </${Section}>`}
+        ${!studio && html`<${Section} title="Paper tags">
           <div class="group group--pad">
             <${TagEditor} value=${s.tags || []} onChange=${save('tags')} placeholder="Add a tag" />
             <p class="field__hint" style="margin-top:10px">Digits after letters show as subscripts, so MnBi2Te4 reads as a formula. arXiv matches on a tag keyword are tagged automatically.</p>
@@ -149,29 +171,29 @@ export function SettingsView({ state, sub, install, onSignOut }) {
             <div class="field" style="margin-top:16px"><span class="field__label">Categories</span><${TagEditor} plain=${true} value=${s.arxivCategories || []} suggestions=${CATEGORY_SUGGESTIONS} onChange=${save('arxivCategories')} placeholder="cond-mat" /></div>
             <p class="field__hint" style="margin-top:10px">cond-mat already covers every condensed matter subcategory. The daily workflow reads these settings each morning.</p>
           </div>
-        </${Section}>
+        </${Section}>`}
         <${Section} title="Sport types">
           <div class="group group--pad"><${TagEditor} plain=${true} value=${s.sportTypes || []} onChange=${save('sportTypes')} placeholder="Add a sport" /></div>
         </${Section}>
-        <${Section} title="Facilities">
+        ${!studio && html`<${Section} title="Facilities">
           <div class="group group--pad"><${TagEditor} plain=${true} value=${s.facilities || []} onChange=${save('facilities')} placeholder="Add a facility" /></div>
-        </${Section}>
+        </${Section}>`}
       </div>
       <div class="stack">
-        <${Section} title="Surf spot"><${SurfSpot} key=${JSON.stringify(s.surf)} surf=${s.surf} /></${Section}>
+        ${!studio && html`<${Section} title="Surf spot"><${SurfSpot} key=${JSON.stringify(s.surf)} surf=${s.surf} /></${Section}>
         <${Section} title="Thesis"><${Thesis} key=${JSON.stringify(s.thesis)} thesis=${s.thesis} /></${Section}>
         <${Section} title="Appearance">
           <div class="group group--pad">
             <${Segmented} label="Theme" value=${theme} onChange=${(t) => { setTheme(t); applyTheme(t); }} items=${[{ id: 'light', label: 'Paper' }, { id: 'dark', label: 'Night' }, { id: 'auto', label: 'Match system' }]} />
             <p class="field__hint" style="margin-top:10px">Saved on this device only.</p>
           </div>
-        </${Section}>
+        </${Section}>`}
         <${Section} title="Level system">
           <div class="group group--pad">
             <div class="field">
               <span class="field__label">Daily goal</span>
               <div class="chips">${[60, 100, 150, 200].map((n) => html`<button key=${n} class="chip" aria-pressed=${(s.xpGoal || 100) === n ? 'true' : 'false'} onClick=${() => actions.saveSettings({ xpGoal: n })}>${n} XP</button>`)}</div>
-              <span class="field__hint">XP comes from tasks, papers, habits, sport and thesis progress. A full day lands around 100.</span>
+              <span class="field__hint">${studio ? 'XP comes from tasks, hours on projects, delivered projects, invoices, habits and sport.' : 'XP comes from tasks, papers, habits, sport and thesis progress.'} A full day lands around 100.</span>
             </div>
           </div>
         </${Section}>

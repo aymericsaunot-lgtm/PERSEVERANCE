@@ -36,11 +36,16 @@ export function LoginView({ backend, describeError }) {
     }
   };
 
+  // The space last used on this device sets the words; the look follows from the stylesheet.
+  const studio = document.documentElement.dataset.edition === 'studio';
   return html`<div class="login">
     <form class="login__card" onSubmit=${submit}>
       <${Mark} size=${56} cls="login__mark" />
-      <h1 class="login__title">Sign in <em>to your almanac.</em></h1>
-      <p class="login__sub">Tasks, papers, beamtimes, surf and habits, in sync between your phone and your computer.</p>
+      ${studio
+        ? html`<h1 class="login__title">Sign in <em>to the studio.</em></h1>
+          <p class="login__sub">Projects, clients, invoices and habits, in sync between your phone and your computer.</p>`
+        : html`<h1 class="login__title">Sign in <em>to your almanac.</em></h1>
+          <p class="login__sub">Tasks, papers, beamtimes, surf and habits, in sync between your phone and your computer.</p>`}
       <label class="field">
         <span class="field__label">Email</span>
         <input class="input" type="email" autocomplete="username" value=${email} onInput=${(e) => setEmail(e.currentTarget.value)} required />

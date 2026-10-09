@@ -28,15 +28,16 @@ export function completeTask(task) {
   }
 }
 
-export function TaskRow({ task, areas, onOpen, showArea = true }) {
+export function TaskRow({ task, areas, onOpen, showArea = true, project = null }) {
   const due = !task.done && dueInfo(task.due);
   return html`<div class=${'row row--indent row--button' + (task.done ? ' row--done' : '')} role="button" tabindex="0"
       onClick=${() => onOpen(task)} onKeyDown=${(e) => e.key === 'Enter' && onOpen(task)}>
     <${Check} checked=${!!task.done} label=${task.done ? 'Mark as not done' : 'Mark as done'} onChange=${() => completeTask(task)} />
     <div class="row__main">
       <div class="row__title">${task.title}</div>
-      ${(showArea && task.area) || task.notes ? html`<div class="row__sub" style="display:flex;align-items:center;gap:6px">
-        ${showArea && task.area && html`<span class="dot" style=${`background:${areaColor(task.area, areas)}`}></span><span>${task.area}</span>`}
+      ${project || (showArea && task.area) || task.notes ? html`<div class="row__sub" style="display:flex;align-items:center;gap:6px">
+        ${project && html`<span class=${'dot sw-dot sw-' + (project.color || 'pink')}></span><span>${project.title}</span>`}
+        ${!project && showArea && task.area && html`<span class="dot" style=${`background:${areaColor(task.area, areas)}`}></span><span>${task.area}</span>`}
         ${task.notes && html`<${Icon} name="edit" size="xs" />`}
       </div>` : null}
     </div>
@@ -58,7 +59,7 @@ function parseQuick(text, areas) {
   return { title: title.replace(/\s+/g, ' ').trim(), area, starred };
 }
 
-export function QuickAddTask({ areas, defaultDue = '', placeholder = 'Add a task', compact = false }) {
+export function QuickAddTask({ areas, defaultDue = '', placeholder = 'Add a task', compact = false, projectId = '' }) {
   const [text, setText] = useState('');
   const [area, setArea] = useState(areas[0] || '');
   const [due, setDue] = useState(defaultDue);
@@ -70,7 +71,7 @@ export function QuickAddTask({ areas, defaultDue = '', placeholder = 'Add a task
     e.preventDefault();
     const q = parseQuick(text, areas);
     if (!q.title) return;
-    actions.add('tasks', { title: q.title, area: q.area || area, due, starred: starred || q.starred, done: false, doneAt: null, notes: '' });
+    actions.add('tasks', { title: q.title, area: projectId ? '' : q.area || area, due, starred: starred || q.starred, done: false, doneAt: null, notes: '', ...(projectId ? { projectId } : {}) });
     setText('');
     setStarred(false);
   };
@@ -84,7 +85,7 @@ export function QuickAddTask({ areas, defaultDue = '', placeholder = 'Add a task
       ${text && html`<button class="btn btn--primary btn--sm" type="submit">Add</button>`}
     </div>
     ${showOpts && html`<div class="quickadd__opts">
-      ${areas.map((a) => html`<button type="button" key=${a} class="chip" aria-pressed=${area === a ? 'true' : 'false'} onClick=${() => setArea(a)}>
+      ${!projectId && areas.map((a) => html`<button type="button" key=${a} class="chip" aria-pressed=${area === a ? 'true' : 'false'} onClick=${() => setArea(a)}>
         <span class="dot" style=${`background:${areaColor(a, areas)}`}></span>${a}</button>`)}
       <span style="width:6px"></span>
       ${dueOpts.map(([v, label]) => html`<button type="button" key=${label} class="chip" aria-pressed=${due === v ? 'true' : 'false'} onClick=${() => setDue(v)}>${label}</button>`)}

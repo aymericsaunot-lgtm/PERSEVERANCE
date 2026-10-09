@@ -14,6 +14,15 @@ It is a plain web app (no build step) that you install like a normal app. Data l
 
 The look is a printed almanac: paper and ink with one orange, Instrument Serif for headlines and numbers, STIX Two for paper titles. Settings, Appearance switches to the Night edition or follows your system.
 
+### Two spaces: Research and Studio
+
+The app has two spaces, and each account shows its own:
+
+- **Research** (yours): everything above.
+- **Studio**, for a freelance designer: Today, Projects (lead, brief, design, feedback, delivered, with tasks, hours, revision rounds and the real hourly rate), Clients, Money (quotes and invoices, paid, waiting and overdue, income per month), Life (habits and sport, boxing by default) and the level system. Bold pastel look: Schibsted Grotesk and DM Mono, colour blocks for projects.
+
+Each account only ever sees its own data; the Firestore rules enforce it. Your account is recorded as Research automatically the first time the new version opens, because it already holds your data. A brand-new account is asked once, on first sign-in, which space it is. Either can switch later in Settings, Space.
+
 ---
 
 ## Setup (about 15 minutes, free, no card)
@@ -102,6 +111,14 @@ Test the script on your computer without touching Firebase:
 python3 scripts/arxiv_watch.py --dry-run --keywords "MnBi2Te4, Rashba crystal, moiré"
 ```
 
+### 8. Add a second account (Studio)
+
+1. Firebase, **Authentication, Users, Add user**: her email and a temporary password. Copy her **User UID**.
+2. Firebase, **Firestore, Rules**: paste the content of `firestore.rules`, replace `YOUR_UID` with your UID and `HER_UID` with hers, and click **Publish**. Without this step her sign-in works but the database refuses her.
+3. Send her the app's address and her password. On first sign-in she picks **Studio**. She can change her password with "Forgot your password?" on the sign-in screen.
+
+The arXiv watch keeps running for your account only.
+
 ---
 
 ## Everyday use
@@ -140,8 +157,10 @@ js/backend-firebase.js  Firestore sync
 js/lib/xp.js          the level system: XP rules, levels, frozen days
 js/lib/               also dates, LaTeX and text, paper lookup and BibTeX, surf forecast
 js/views/             one file per screen (progress.js is the level system)
+js/views/studio/      the Studio space: today, projects, clients, money, the sheets, the frame
+css/studio.css        the Studio look, applied only to Studio accounts
 vendor/               Preact and the Firebase SDK, bundled locally
-fonts/                Instrument Serif, Instrument Sans and STIX Two, with their licences
+fonts/                Instrument Serif, Instrument Sans, STIX Two, Schibsted Grotesk and DM Mono, with their licences
 scripts/arxiv_watch.py  the daily arXiv check
 .github/workflows/    the GitHub schedule for that check
 ```
@@ -152,4 +171,4 @@ scripts/arxiv_watch.py  the daily arXiv check
 - Crossref, DataCite and the arXiv API for paper details. Nothing is sent except the identifier you paste.
 - rss.arxiv.org for the daily listings.
 - Open-Meteo for the marine and wind forecast (free for non-commercial use; data from Météo-France, DWD, ECMWF and NOAA models).
-- Fonts: Instrument Serif, Instrument Sans and STIX Two Text, all under the SIL Open Font License.
+- Fonts: Instrument Serif, Instrument Sans, STIX Two Text, Schibsted Grotesk and DM Mono, all under the SIL Open Font License.

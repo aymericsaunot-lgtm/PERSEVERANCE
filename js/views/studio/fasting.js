@@ -1,7 +1,7 @@
 // Studio: overnight fasting. Log the end of dinner, and a timer runs until she can eat again
 // (12 hours by default, Settings can change it). The notification sender also uses `fasts`.
-import { html, useState, useEffect } from '../../../vendor/preact.js';
-import { actions } from '../../store.js';
+import { html, useState, useEffect, useRef } from '../../../vendor/preact.js';
+import { actions, getState } from '../../store.js';
 import { Icon, toast } from '../../ui.js';
 import { XP } from '../../lib/xp.js';
 import { isoOf, addDays, todayISO, fmtDate } from '../../lib/dates.js';
@@ -20,13 +20,14 @@ const dayWord = (ms) => {
 };
 const announced = new Set();
 
-// Today at hh:mm, or yesterday if that time has not come yet (dinner logged the next morning).
+// Today at hh:mm, or yesterday if that time is more than two hours ahead (dinner logged the next
+// morning). A time just ahead, like 21:00 picked at 20:57, stays today.
 function startFromTime(hhmm) {
   const [h, m] = hhmm.split(':').map(Number);
   const d = new Date();
   d.setHours(h, m, 0, 0);
-  if (d.getTime() > Date.now()) d.setDate(d.getDate() - 1);
-  return d.getTime();
+  if (d.getTime() > Date.now() + 2 * HOUR) d.setDate(d.getDate() - 1);
+  return Math.min(d.getTime(), Date.now());
 }
 
 // Completed fasts on consecutive days, ending today or yesterday.
@@ -64,19 +65,30 @@ export function FastCard({ state }) {
     }
   }, [active && active.id, left <= 0]);
 
+  // One fast at a time, and one write per tap: a double tap must not start or end twice.
+  const busy = useRef(null);
+  useEffect(() => { busy.current = null; }, [active && active.id]);
   const start = (ms) => {
+    if (busy.current === 'start' || getState().data.fasts.some((f) => !f.end)) return;
+    busy.current = 'start';
     actions.add('fasts', { start: ms, end: null, target: hours, createdAt: Date.now() });
     toast(`Fast started. You can eat again at ${clock(ms + hours * HOUR)}.`, { ms: 5000 });
     setTime('');
   };
   const finish = () => {
+    if (busy.current === active.id) return;
+    busy.current = active.id;
     const end = Date.now();
     const ok = end - active.start >= target;
     actions.update('fasts', active.id, { end });
     toast(ok ? `${span(end - active.start)} fast. Well done.` : `Fast ended after ${span(end - active.start)}.`, ok ? { xp: XP.fast } : {});
   };
   const moveStart = () => {
-    if (time) actions.update('fasts', active.id, { start: startFromTime(time), notifiedAt: null });
+    if (time) {
+      const s = startFromTime(time);
+      // Announce again only if the new end is still to come.
+      actions.update('fasts', active.id, { start: s, ...(s + target > Date.now() ? { notifiedAt: null } : {}) });
+    }
     setEditing(false);
     setTime('');
   };

@@ -1,5 +1,5 @@
 // Offline cache. Bump VERSION whenever you change any file, so installed apps update.
-const VERSION = '2026.10.11';
+const VERSION = '2026.10.11.2';
 const CACHE = `dashboard-${VERSION}`;
 
 const SHELL = [

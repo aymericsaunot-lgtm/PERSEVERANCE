@@ -262,7 +262,7 @@ def plan(now_utc, settings, log, src, forecast=None):
             try:
                 fc_cache["v"] = forecast(spot) if forecast else None
             except Exception as e:  # the forecast is a bonus: never block the rest
-                print(f"  surf forecast unavailable: {e}", file=sys.stderr)
+                print(f"  surf forecast unavailable ({type(e).__name__})", file=sys.stderr)
                 fc_cache["v"] = None
         return fc_cache["v"]
 
@@ -272,8 +272,11 @@ def plan(now_utc, settings, log, src, forecast=None):
         brief = [task_line(today_tasks(src.list("tasks"), today))]
         if studio:
             projects = [x for x in src.list("projects") if x.get("stage") != "done" and x.get("due")]
-            due_now = [x for x in projects if x["due"] <= today]
+            behind = [x for x in projects if x["due"] < today]
+            due_now = [x for x in projects if x["due"] == today]
             soon = sorted((x for x in projects if today < x["due"] <= (local.date() + timedelta(days=7)).isoformat()), key=lambda x: x["due"])
+            if behind:
+                brief.append(f"Late: {listing([x.get('title', '') for x in behind])}.")
             if due_now:
                 brief.append(f"Due today: {listing([x.get('title', '') for x in due_now])}.")
             elif soon:
@@ -308,7 +311,7 @@ def plan(now_utc, settings, log, src, forecast=None):
                 if b:
                     brief.append(f"Surf: {SCORE_LABEL[b['score']].lower()}" + (f", best around {b['label']}, {surf_words(b)}." if b["score"] >= 2 else "."))
         brief = [line for line in brief if line]
-        if on("morning") and brief:
+        if on("morning") and brief and not seen(f"brief:{today}"):
             p.send(f"brief:{today}", f"{local:%A} {local.day} {local:%B}", "\n".join(brief), "./#/today", "brief")
 
         if studio:
@@ -334,7 +337,7 @@ def plan(now_utc, settings, log, src, forecast=None):
                     if i.get("kind") == "quote":
                         sent_at = i.get("sentAt") or 0
                         key = f"quote:{i['id']}"
-                        if sent_at and now_ms - sent_at >= 7 * DAY_MS and not seen(key):
+                        if sent_at and 7 * DAY_MS <= now_ms - sent_at < 14 * DAY_MS and not seen(key):
                             p.send(key, f"Quote {i.get('number', '')} has waited a week".replace("  ", " "),
                                    f"No answer from {who} yet. A short follow-up?", "./#/money", f"quote-{i['id']}")
                     elif i.get("due") and i["due"] < today:
@@ -374,7 +377,8 @@ def plan(now_utc, settings, log, src, forecast=None):
 
     # Surf, the evening before a good or great day.
     if not studio and on("surf") and log.get("surf") != today and in_window(local, SURF_EVENING[0], SURF_EVENING[1] - SURF_EVENING[0]):
-        p.log["surf"] = today
+        if fc():  # no forecast: leave the day open so the next run tries again
+            p.log["surf"] = today
         b = best_window(fc(), spot.get("facing"), tomorrow) if fc() else None
         if b and b["score"] >= 3:
             p.send(f"surf:{tomorrow}", f"Tomorrow looks {SCORE_LABEL[b['score']].lower()} at {spot.get('name') or 'your spot'}",
@@ -457,7 +461,7 @@ class FirestoreSource:
         return snap.to_dict() if snap.exists else None
 
 
-def run_user(ref, now, key, subject, dry_run):
+def run_user(ref, now, key, subject, dry_run, label="account"):
     from pywebpush import WebPushException, webpush
 
     devices = [{**(s.to_dict() or {}), "id": s.id} for s in ref.collection("devices").stream()]
@@ -471,25 +475,28 @@ def run_user(ref, now, key, subject, dry_run):
     log = (snap.to_dict() or {}) if snap.exists else {}
     now_ms = int(now.timestamp() * 1000)
     p = plan(now, settings, log, src, forecast=load_forecast)
-    who = ref.id[:6]
     if not p.messages and not p.log:
         return
 
-    sent, gone, failed = [], set(), 0
+    # The repository is public, so are its Actions logs: print kinds and counts, never the
+    # text of a notification, an account id or an error message (it can hold the endpoint).
+    sent, missed, gone, failed = [], [], set(), 0
     for m in p.messages:
+        kind = m["key"].split(":")[0]
         payload = json.dumps({"title": m["title"], "body": m["body"], "url": m["url"], "tag": m["tag"], "icon": f"icons/{p.icon}-192.png"})
+        headers = {"Urgency": "high"} if kind in ("fast", "test") else None
         delivered = False
         for d in devices:
             if d["id"] in gone:
                 continue
             if dry_run:
-                print(f"  [{who}] would send to {d.get('label') or d['id']}: {m['title']} | {m['body']!r}")
+                print(f"  [{label}] would send to {d.get('label') or 'a device'}: {m['title']} | {m['body']!r}")
                 delivered = True
                 continue
             try:
                 # A fresh claims dict per call: webpush fills in "aud" for the endpoint's push service.
                 webpush(subscription_info={"endpoint": d["endpoint"], "keys": d["keys"]}, data=payload,
-                        vapid_private_key=key, vapid_claims={"sub": subject}, ttl=m["ttl"], timeout=20)
+                        vapid_private_key=key, vapid_claims={"sub": subject}, ttl=m["ttl"], timeout=20, headers=headers)
                 delivered = True
             except WebPushException as e:
                 status = getattr(getattr(e, "response", None), "status_code", None)
@@ -497,23 +504,28 @@ def run_user(ref, now, key, subject, dry_run):
                     gone.add(d["id"])
                 else:
                     failed += 1
-                    print(f"  [{who}] push failed ({status}): {e}", file=sys.stderr)
+                    print(f"  [{label}] {kind}: push refused (HTTP {status})", file=sys.stderr)
             except Exception as e:  # network trouble: count it, keep going
                 failed += 1
-                print(f"  [{who}] push failed: {type(e).__name__}: {e}", file=sys.stderr)
-        if delivered:
-            sent.append(m["key"])
-            print(f"  [{who}] sent: {m['title']}")
+                print(f"  [{label}] {kind}: push failed ({type(e).__name__})", file=sys.stderr)
+        (sent if delivered else missed).append(m["key"])
+    if sent:
+        print(f"  [{label}] sent {len(sent)}: {', '.join(k.split(':')[0] for k in sent)}")
 
     if dry_run:
         return
+    if failed and not sent:
+        print(f"  [{label}] nothing delivered; will try again next run", file=sys.stderr)
+        return
+    # A message that did not go out keeps its slot open, so the next run tries it again.
+    marker = {"test": "test", "arxiv": "arxiv", "surf": "surf", "habits": "pm"}
+    plan_log = dict(p.log)
+    for k in missed:
+        plan_log.pop(marker.get(k.split(":")[0], "am"), None)
+    log_ref.set(merge_log(log, plan_log, sent, now_ms))
     for did in gone:
         ref.collection("devices").document(did).delete()
-        print(f"  [{who}] removed a device that unsubscribed")
-    if failed and not sent:
-        print(f"  [{who}] nothing delivered; will try again next run", file=sys.stderr)
-        return
-    log_ref.set(merge_log(log, p.log, sent, now_ms))
+        print(f"  [{label}] removed a device that unsubscribed")
     for fid in p.fasts:
         if f"fast:{fid}" in sent:
             ref.collection("fasts").document(fid).update({"notifiedAt": now_ms})
@@ -541,11 +553,11 @@ def main():
     subject = vapid_subject()
     users = list(db.collection("users").list_documents())
     print(f"{now:%Y-%m-%d %H:%M} UTC, {plural(len(users), 'account')}")
-    for ref in users:
+    for n, ref in enumerate(users, 1):
         try:
-            run_user(ref, now, key, subject, args.dry_run)
-        except Exception as e:  # one account must not stop the others
-            print(f"::warning::{ref.id[:6]}: {type(e).__name__}: {e}")
+            run_user(ref, now, key, subject, args.dry_run, label=f"account {n}")
+        except Exception as e:  # one account must not stop the others; no message text in a public log
+            print(f"::warning::account {n}: {type(e).__name__}" + (f": {e}" if args.dry_run else ""))
 
 
 # ---------------------------------------------------------------- self-test

@@ -173,6 +173,8 @@ Good to know:
 
 - GitHub can start a scheduled run late when it is busy. A notification can come 5 to 20 minutes after its time, and the end of a fast within about 10 minutes.
 - Scheduled workflows pause after 60 days without a commit to the repository, both this one and the arXiv watch. GitHub emails you, and **Enable workflow** in the Actions tab restarts them. Uploading any change also resets the 60 days.
+- Signing out turns notifications off on that device. Sign in and tap **Turn on** to get them again.
+- The Actions logs are public, like the repository, so the script prints only how many notifications of each kind went out, never their text.
 - If a phone stops receiving them, open **Settings, Notifications** on that phone. If it says they are off, tap **Turn on** again. Removing the app from the Home Screen also removes its notifications.
 - If the private key is lost or leaked, make a new pair, for example with `npx web-push generate-vapid-keys`. Put the public key in `config.js` (`push.publicKey`) and the private key in the `VAPID_PRIVATE_KEY` secret, then upload. On each phone, turn notifications off and on again.
 
@@ -193,7 +195,7 @@ python3 scripts/notify.py --self-test
 - **BibTeX**: Papers, filter to what you need (status, tag, search), then BibTeX. Download a `.bib` file or copy it. Keys look like `Ishizaka2011Giant`.
 - **Surf**: Settings, Surf spot. The default is Hendaye with the beach facing NNW (340°); wind counts as offshore when it blows from the opposite side. The quality bars are a rough guide.
 - **Backups**: Settings, Your data, Export backup. One JSON file with everything; Import restores it into any account.
-- **App icon**: Settings, App icon. There are four designs: Sunset, Tide, P. and Blocks. The app and the browser tab change at once. A phone keeps the icon the app had when it was added, so remove the app from the Home Screen and add it again; your data stays. To change a design, edit its SVG in `js/icons.js` (64 by 64) and replace its three PNGs in `icons/` (`<name>-180.png` for iPhone, `-192` and `-512` for Android). To add one, add an entry there and its three PNGs.
+- **App icon**: Settings, App icon. There are four designs: Sunset, Tide, P. and Blocks. The app and the browser tab change at once. A phone keeps the icon the app had when it was added, so remove the app from the Home Screen, open the link in the browser, sign in, and add it again; your data stays. Signing in first matters: before sign-in the page shows the default icon. To change a design, edit its SVG in `js/icons.js` (64 by 64) and replace its three PNGs in `icons/` (`<name>-180.png` for iPhone, `-192` and `-512` for Android). To add one, add an entry there and its three PNGs.
 - **Fasting** (Studio): after dinner, tap **Dinner done, start 12 h** on Today. The card counts down and shows when she can eat. If she forgot, she types the time dinner ended. In the morning she taps **I ate**. A fast of 12 hours or more earns 15 XP and adds to the streak. The length is in Settings, Fasting.
 
 ## Free quota

@@ -33,7 +33,9 @@ function startFromTime(hhmm) {
 // Completed fasts on consecutive days, ending today or yesterday.
 export function fastStreak(fasts, hours, today = todayISO()) {
   const days = new Set(fasts.filter((f) => f.end && f.end - f.start >= targetOf(f, hours)).map((f) => isoOf(new Date(f.end))));
-  let d = days.has(today) ? today : addDays(today, -1);
+  // A fast that ended today, done or short, decides today; otherwise count from yesterday.
+  const endedToday = fasts.some((f) => f.end && isoOf(new Date(f.end)) === today);
+  let d = endedToday ? today : addDays(today, -1);
   let n = 0;
   while (days.has(d)) { n++; d = addDays(d, -1); }
   return n;

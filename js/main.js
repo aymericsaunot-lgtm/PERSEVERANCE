@@ -16,6 +16,7 @@ import { StudioShell, EditionChooser } from './views/studio/shell.js';
 import { progressOf, archivePatch } from './lib/xp.js';
 import { todayISO } from './lib/dates.js';
 import { applyAppIcon, setCurrentIcon, currentIcon, defaultIcon } from './icons.js';
+import { disablePush } from './push.js';
 
 const EDITION_KEY = 'dash.edition';
 const cachedEdition = () => { try { return localStorage.getItem(EDITION_KEY) || ''; } catch (e) { return ''; } };
@@ -227,6 +228,8 @@ function App() {
   const state = useStore();
   const phase = state.status.phase;
   const onSignOut = async () => {
+    // This browser stops receiving the account's notifications once nobody is signed in.
+    try { await disablePush(); } catch (e) { /* not subscribed, or no push here */ }
     await getBackend().signOut();
     go('today');
   };

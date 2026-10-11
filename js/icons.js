@@ -47,7 +47,8 @@ export const iconSvg = (id, round = false) => round
   : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">${iconById(id).svg}</svg>`;
 
 const KEY = 'dash.icon';
-let current = (() => { try { return localStorage.getItem(KEY) || 'sunset'; } catch (e) { return 'sunset'; } })();
+// Before sign-in: the last icon used here, else the default of the last space used here.
+let current = (() => { try { return localStorage.getItem(KEY) || defaultIcon(localStorage.getItem('dash.edition')); } catch (e) { return 'sunset'; } })();
 export const currentIcon = () => current;
 // For the in-app marks during a render; applyAppIcon does the rest after it.
 export const setCurrentIcon = (id) => { current = iconById(id).id; };
@@ -76,7 +77,8 @@ export function applyAppIcon(id, edition) {
   const abs = (p) => new URL(p, location.href).href;
   const colour = studio ? '#F8F8F4' : '#EEEAE0';
   const manifest = {
-    id: abs('./'), name: config.appName, short_name: config.appName, start_url: abs('./'), scope: abs('./'), display: 'standalone',
+    // No "id": like manifest.webmanifest, it defaults to start_url, so installs stay one app.
+    name: config.appName, short_name: config.appName, start_url: abs('./'), scope: abs('./'), display: 'standalone',
     background_color: colour, theme_color: colour,
     icons: [
       { src: abs(`icons/${icon.id}-192.png`), sizes: '192x192', type: 'image/png' },

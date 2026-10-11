@@ -44,6 +44,9 @@ export async function enablePush() {
   // A subscription made with another key would be refused by the push service: start again.
   const held = sub && sub.options && sub.options.applicationServerKey ? new Uint8Array(sub.options.applicationServerKey) : null;
   if (held && (held.length !== key.length || held.some((b, i) => b !== key[i]))) { await sub.unsubscribe().catch(() => {}); sub = null; }
+  // A subscription this account does not own (another account used this browser): start
+  // again, so two accounts never share one.
+  if (sub && !getState().data.devices.some((d) => d.endpoint === sub.endpoint)) { await sub.unsubscribe().catch(() => {}); sub = null; }
   if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
   const json = sub.toJSON();
   const id = await deviceId(json.endpoint);
@@ -60,7 +63,8 @@ export async function disablePush() {
   if (!sub) return;
   const id = await deviceId(sub.endpoint);
   await sub.unsubscribe().catch(() => {});
-  actions.remove('devices', id);
+  // Only this account's record; if it never had one, there is nothing to remove.
+  if (getState().data.devices.some((d) => d.id === id)) actions.remove('devices', id);
 }
 
 export async function thisDeviceId() {

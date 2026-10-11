@@ -87,7 +87,7 @@ function AppIcon({ settings }) {
         <${Mark} icon=${i.id} size=${56} /><span>${i.label}</span>
       </button>`)}
     </div>
-    <p class="field__hint" style="margin-top:12px">It changes at once in the app and the browser tab. A phone keeps the icon the app had when it was added: remove the app from the Home Screen and add it again to get the new one.</p>
+    <p class="field__hint" style="margin-top:12px">It changes at once in the app and the browser tab. A phone keeps the icon the app had when it was added: remove the app from the Home Screen, open the link in the browser, sign in, and add it again to get the new one.</p>
   </div>`;
 }
 

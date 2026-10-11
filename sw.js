@@ -1,5 +1,5 @@
 // Offline cache. Bump VERSION whenever you change any file, so installed apps update.
-const VERSION = '2026.10.11.2';
+const VERSION = '2026.10.11.3';
 const CACHE = `dashboard-${VERSION}`;
 
 const SHELL = [
@@ -141,8 +141,12 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil((async () => {
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const w of windows) {
-      if (new URL(w.url).origin !== self.location.origin) continue;
-      try { await w.navigate(url); } catch (e) { /* some browsers refuse; focusing is enough */ }
+      // Other GitHub Pages sites share the origin: only this app's windows.
+      if (!w.url.startsWith(self.registration.scope)) continue;
+      try {
+        const c = await w.navigate(url);
+        if (c) return c.focus();
+      } catch (e) { /* some browsers refuse; focusing is enough */ }
       return w.focus();
     }
     return self.clients.openWindow(url);

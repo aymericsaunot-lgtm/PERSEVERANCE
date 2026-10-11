@@ -1,1 +1,3 @@
 firebase-admin>=6.5
+pywebpush>=2.0
+tzdata

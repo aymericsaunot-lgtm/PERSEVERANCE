@@ -10,6 +10,7 @@ import { inWords } from '../progress.js';
 import { money, hoursOf, dueText, invoiceState, STATE_LABEL, byDue } from './common.js';
 import { ProjectCard } from './projects.js';
 import { ProjectSheet, InvoiceSheet } from './sheets.js';
+import { FastCard, FastHistory } from './fasting.js';
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -62,7 +63,7 @@ export function StudioToday({ state, p, go }) {
             </div>
           </${Section}>
         </div>
-        <div style="--o:2">
+        <div style="--o:3">
           <${Section} title="On the go" action=${html`<button class="link-btn" onClick=${() => go('projects')}>All projects</button>`}>
             ${active.length
               ? html`<div class="pgrid pgrid--two">${active.slice(0, 4).map((x) => html`<${ProjectCard} key=${x.id} project=${x} state=${state} onOpen=${setOpenProject} />`)}</div>`
@@ -71,7 +72,8 @@ export function StudioToday({ state, p, go }) {
         </div>
       </div>
       <div class="bento__col">
-        <div style="--o:3">
+        <div style="--o:2"><${FastCard} state=${state} /></div>
+        <div style="--o:4">
           <${Section} title="Money" action=${html`<button class="link-btn" onClick=${() => go('money')}>All</button>`}>
             <div class="group">
               ${sent.length ? sent.sort((a, b) => (a.due || '').localeCompare(b.due || '')).slice(0, 4).map((i) => {
@@ -88,7 +90,7 @@ export function StudioToday({ state, p, go }) {
             </div>
           </${Section}>
         </div>
-        <div style="--o:4">
+        <div style="--o:5">
           <${Section} title="Habits" action=${html`<button class="link-btn" onClick=${() => go('life')}>Life</button>`}>
             <div class="group">
               <${HabitChips} habits=${habits} />
@@ -111,7 +113,11 @@ export function StudioLife({ state }) {
       <div class="s-head__row"><h1 class="s-title">Life</h1></div>
     </header>
     <div class="grid-2">
-      <${HabitList} habits=${state.data.habits} />
+      <div class="stack">
+        <div class="section"><${FastCard} state=${state} /></div>
+        ${state.data.fasts.some((f) => f.end) && html`<${Section} title="Recent fasts"><${FastHistory} state=${state} /></${Section}>`}
+        <${HabitList} habits=${state.data.habits} />
+      </div>
       <${SportLog} sessions=${state.data.sessions} settings=${state.data.settings} surfNow=${null} />
     </div>
   </div>`;

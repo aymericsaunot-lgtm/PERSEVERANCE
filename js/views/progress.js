@@ -119,7 +119,7 @@ function WeekChart({ weeks }) {
 
 const KIND = {
   task: 'Task', deadline: 'Deadline', beamtime: 'Beamtime', thesis: 'Thesis', paper: 'Paper read', sport: 'Sport', habit: 'Habit', bonus: 'Bonus',
-  project: 'Project delivered', time: 'Hours', client: 'New client', quote: 'Quote accepted', sent: 'Invoice sent', paid: 'Invoice paid',
+  project: 'Project delivered', time: 'Hours', client: 'New client', quote: 'Quote accepted', sent: 'Invoice sent', paid: 'Invoice paid', fast: 'Fast',
 };
 
 function whenLabel(day) {

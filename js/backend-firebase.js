@@ -10,6 +10,9 @@ import {
 import { COLLECTIONS, setDocs, setSettingsDoc, setArxivStatus, setMetaDocs, setStatus, resetData, clean } from './store.js';
 import { isoOf, DAY } from './lib/dates.js';
 
+// Backups leave out the devices: a phone's push address belongs to that phone and that account.
+const BACKUP = [...COLLECTIONS.filter((c) => c !== 'devices'), 'meta'];
+
 export function createFirebaseBackend(config, { onError }) {
   const app = initializeApp(config);
   const auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });
@@ -70,7 +73,8 @@ export function createFirebaseBackend(config, { onError }) {
     listen('tasks-done', query(userCol('tasks'), where('doneAt', '>=', doneCutoff)), (docs) => { done = docs; pushTasks(); });
     listen('sessions', query(userCol('sessions'), where('date', '>=', sessionCutoff)), (docs) => setDocs('sessions', docs));
     listen('timelogs', query(userCol('timelogs'), where('date', '>=', sessionCutoff)), (docs) => setDocs('timelogs', docs));
-    for (const name of ['papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'habits', 'projects', 'clients', 'invoices']) {
+    listen('fasts', query(userCol('fasts'), where('start', '>=', Date.now() - 120 * DAY)), (docs) => setDocs('fasts', docs));
+    for (const name of ['papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'habits', 'projects', 'clients', 'invoices', 'devices']) {
       listen(name, userCol(name), (docs) => setDocs(name, docs));
     }
     listen('meta', userCol('meta'), (docs) => {
@@ -102,7 +106,7 @@ export function createFirebaseBackend(config, { onError }) {
     saveMeta(id, patch) { setDoc(userDoc('meta', id), patch, { merge: true }).catch(report); },
     async exportAll() {
       const out = { format: 'dashboard-backup', version: 1, exportedAt: new Date().toISOString(), collections: {} };
-      for (const name of [...COLLECTIONS, 'meta']) {
+      for (const name of BACKUP) {
         const snap = await getDocs(userCol(name));
         out.collections[name] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       }
@@ -115,7 +119,7 @@ export function createFirebaseBackend(config, { onError }) {
       let batch = writeBatch(db);
       let inBatch = 0;
       for (const [name, docs] of Object.entries(cols)) {
-        if (![...COLLECTIONS, 'meta'].includes(name) || !Array.isArray(docs)) continue;
+        if (!BACKUP.includes(name) || !Array.isArray(docs)) continue;
         for (const d of docs) {
           if (!d || !d.id) continue;
           batch.set(userDoc(name, String(d.id)), clean(d));

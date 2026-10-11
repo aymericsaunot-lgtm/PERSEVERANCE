@@ -1,6 +1,7 @@
 // Studio: the frame around the screens (top bar on wide screens, tab bar on phones), and the
 // one-time choice of space for a new account.
 import { html, useState } from '../../../vendor/preact.js';
+import { config } from '../../../config.js';
 import { Icon, Mark } from '../../ui.js';
 import { TasksView, todayTasks } from '../tasks.js';
 import { ProgressView } from '../progress.js';
@@ -42,7 +43,7 @@ export function StudioShell({ state, p, route, go, install, onSignOut }) {
 
   return html`<div class="s-shell">
     <header class="s-bar">
-      <button class="s-brand" onClick=${() => go('today')}><${Mark} size=${26} /><span>Studio</span></button>
+      <button class="s-brand" onClick=${() => go('today')}><${Mark} size=${26} /><span>${config.appName}</span></button>
       <nav class="s-links" aria-label="Sections">
         ${NAV.map((n) => html`<button key=${n.id} class="s-link" aria-current=${active === n.id ? 'page' : undefined} onClick=${() => go(n.id)}>${n.label}${badges[n.id] > 0 && html`<span class="s-badge">${badges[n.id]}</span>`}</button>`)}
       </nav>

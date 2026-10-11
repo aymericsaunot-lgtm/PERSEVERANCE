@@ -37,6 +37,7 @@ export const XP = {
   quote: 30,
   invoiceSent: 10,
   invoicePaid: 40,
+  fast: 15,
 };
 
 // One XP per two minutes of sport, at most 60 per session.
@@ -64,6 +65,7 @@ const RULES_BY = {
     ['Invoice sent, then paid', `${XP.invoiceSent} XP, then ${XP.invoicePaid}`, 'mind'],
     ['Sport', '1 XP per 2 minutes, up to 60', 'body'],
     ['Habit ticked', `${XP.habit} XP, ${XP.allHabits} bonus for all of them`, 'discipline'],
+    ['Fast completed', `${XP.fast} XP`, 'discipline'],
   ],
 };
 export const rulesFor = (edition) => RULES_BY[edition] || RULES_BY.research;
@@ -131,6 +133,12 @@ export function xpEvents(data, today = todayISO()) {
   for (const p of projects) if (p.stage === 'done' && p.doneAt) push(dayOf(p.doneAt), 'work', XP.project, p.title, 'project', p.doneAt);
   for (const t of data.timelogs || []) push(t.date, 'work', timeXP(t.minutes), `${title.get(t.projectId) || 'Studio time'}, ${Math.round((t.minutes / 60) * 10) / 10} h`, 'time', t.createdAt || 0);
   for (const c of data.clients || []) if (c.createdAt) push(dayOf(c.createdAt), 'mind', XP.client, c.name, 'client', c.createdAt);
+  const fastHours = Number(data.settings.fastHours) || 12;
+  for (const f of data.fasts || []) {
+    if (f.end && f.end - f.start >= (Number(f.target) || fastHours) * 3600000) {
+      push(dayOf(f.end), 'discipline', XP.fast, `Fast, ${Math.round(((f.end - f.start) / 3600000) * 10) / 10} h`, 'fast', f.end);
+    }
+  }
   for (const inv of data.invoices || []) {
     const label = `${inv.number || (inv.kind === 'quote' ? 'Quote' : 'Invoice')}${title.get(inv.projectId) ? `, ${title.get(inv.projectId)}` : ''}`;
     if (inv.kind === 'quote') {

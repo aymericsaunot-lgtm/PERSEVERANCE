@@ -2,8 +2,9 @@
 import { useEffect, useState, useRef } from '../vendor/preact.js';
 import { uid } from './lib/text.js';
 
-// The last four belong to the Studio space; a Research account simply has none.
-export const COLLECTIONS = ['tasks', 'papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'sessions', 'habits', 'projects', 'clients', 'invoices', 'timelogs'];
+// projects to fasts belong to the Studio space; a Research account simply has none.
+// devices are the phones and computers that receive notifications.
+export const COLLECTIONS = ['tasks', 'papers', 'arxiv', 'beamtimes', 'deadlines', 'chapters', 'sessions', 'habits', 'projects', 'clients', 'invoices', 'timelogs', 'fasts', 'devices'];
 
 export const DEFAULT_SETTINGS = {
   taskAreas: ['PhD', 'EigenMode', 'Freelance', 'Games', 'Life'],
@@ -19,12 +20,21 @@ export const DEFAULT_SETTINGS = {
   currency: 'EUR',
   paymentDays: 30,
   projectTypes: ['Branding', 'Logo', 'UI/UX', 'Web', 'Social media', 'Print', 'Packaging', 'Illustration'],
+  fastHours: 12,
+  // What the notification sender (scripts/notify.py) may send, and when, in this time zone.
+  notify: {
+    morning: true, morningAt: '08:00',
+    evening: true, eveningAt: '21:00',
+    deadlines: true, arxiv: true, surf: true,
+    projects: true, invoices: true, fasting: true,
+    tz: '',
+  },
 };
 
 const state = {
   data: {
     tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [],
-    projects: [], clients: [], invoices: [], timelogs: [],
+    projects: [], clients: [], invoices: [], timelogs: [], fasts: [], devices: [],
     settings: DEFAULT_SETTINGS,
     arxivStatus: null,
     progress: null,
@@ -86,6 +96,7 @@ export function setSettingsDoc(doc) {
       ...d,
       surf: { ...DEFAULT_SETTINGS.surf, ...(d.surf || {}) },
       thesis: { ...DEFAULT_SETTINGS.thesis, ...(d.thesis || {}) },
+      notify: { ...DEFAULT_SETTINGS.notify, ...(d.notify || {}) },
     },
   };
   state.loaded.add('settings');
@@ -114,7 +125,7 @@ export function setStatus(patch) {
 }
 
 export function resetData() {
-  state.data = { ...state.data, tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [], projects: [], clients: [], invoices: [], timelogs: [], settings: DEFAULT_SETTINGS, arxivStatus: null, progress: null };
+  state.data = { ...state.data, tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [], projects: [], clients: [], invoices: [], timelogs: [], fasts: [], devices: [], settings: DEFAULT_SETTINGS, arxivStatus: null, progress: null };
   state.loaded = new Set();
   notify();
 }

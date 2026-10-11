@@ -1,5 +1,5 @@
 // Offline cache. Bump VERSION whenever you change any file, so installed apps update.
-const VERSION = '2026.10.09';
+const VERSION = '2026.10.11';
 const CACHE = `dashboard-${VERSION}`;
 
 const SHELL = [
@@ -12,6 +12,8 @@ const SHELL = [
   './vendor/preact.js',
   './vendor/firebase.js',
   './js/main.js',
+  './js/icons.js',
+  './js/push.js',
   './js/store.js',
   './js/ui.js',
   './js/version.js',
@@ -33,6 +35,7 @@ const SHELL = [
   './js/views/studio/sheets.js',
   './js/views/studio/shell.js',
   './js/views/studio/today.js',
+  './js/views/studio/fasting.js',
   './js/views/settings.js',
   './js/views/tasks.js',
   './js/views/today.js',
@@ -56,10 +59,7 @@ const SHELL = [
   './fonts/stix-greek-400.woff2',
   './fonts/stix-greek-500.woff2',
   './icons/favicon.svg',
-  './icons/apple-touch-icon.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/icon-maskable-512.png',
+  ...['sunset', 'tide', 'bold', 'blocks'].flatMap((id) => [180, 192, 512].map((px) => `./icons/${id}-${px}.png`)),
 ];
 
 self.addEventListener('install', (event) => {
@@ -118,5 +118,33 @@ self.addEventListener('fetch', (event) => {
     const res = await fetch(req);
     if (res.ok) cache.put(req, res.clone());
     return res;
+  })());
+});
+
+// Notifications sent by scripts/notify.py: {title, body, url, tag, icon}.
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data ? event.data.text() : '' }; }
+  event.waitUntil(self.registration.showNotification(data.title || 'Perceverance', {
+    body: data.body || '',
+    icon: new URL(data.icon || './icons/sunset-192.png', self.location.href).href,
+    tag: data.tag || undefined,
+    renotify: !!data.tag,
+    data: { url: data.url || './' },
+  }));
+});
+
+// A tap on a notification opens the app on the right screen, reusing an open window.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || './', self.location.href).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const w of windows) {
+      if (new URL(w.url).origin !== self.location.origin) continue;
+      try { await w.navigate(url); } catch (e) { /* some browsers refuse; focusing is enough */ }
+      return w.focus();
+    }
+    return self.clients.openWindow(url);
   })());
 });

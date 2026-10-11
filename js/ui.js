@@ -2,6 +2,7 @@
 import { html, useEffect, useLayoutEffect, useRef, useState } from '../vendor/preact.js';
 import { latexToSegments, chemSegments, sameTag } from './lib/text.js';
 import { parseISO } from './lib/dates.js';
+import { iconSvg, currentIcon } from './icons.js';
 
 const PATHS = {
   today: '<path d="M3 18h18"/><path d="M6.5 18a5.5 5.5 0 0 1 11 0"/><path d="M12 8V5"/><path d="m5.3 11.3-1.8-1.8"/><path d="m18.7 11.3 1.8-1.8"/>',
@@ -65,14 +66,10 @@ export function Icon({ name, size, cls = '', label }) {
   return html`<svg class=${'icon' + sizeCls + (cls ? ' ' + cls : '')} viewBox="0 0 24 24" aria-hidden=${label ? undefined : 'true'} role=${label ? 'img' : undefined} aria-label=${label} dangerouslySetInnerHTML=${{ __html: PATHS[name] || '' }}></svg>`;
 }
 
-// The app mark: a low sun over the sea, on buoy orange.
-export function Mark({ size = 28, cls = '' }) {
-  return html`<svg class=${'mark ' + cls} width=${size} height=${size} viewBox="0 0 64 64" aria-hidden="true">
-    <rect width="64" height="64" rx="14" fill="#DD4F1C" />
-    <circle cx="32" cy="33" r="12" fill="#F8F6F0" />
-    <path d="M0 39c7-3.5 12 3 20 0s12-4 20-1 13 3.5 24-.5V50c0 7.7-6.3 14-14 14H14C6.3 64 0 57.7 0 50z" fill="#1C1A16" />
-    <path d="M10 48.5c5-2 9 1.6 14 0M34 52.5c5-2 9 1.6 14 0" stroke="#F8F6F0" stroke-width="1.6" stroke-linecap="round" fill="none" opacity="0.55" />
-  </svg>`;
+// The app mark: the icon this account chose (see js/icons.js), with rounded corners.
+export function Mark({ size = 28, cls = '', icon }) {
+  return html`<span class=${'mark ' + cls} style=${`width:${size}px;height:${size}px`} aria-hidden="true"
+    dangerouslySetInnerHTML=${{ __html: iconSvg(icon || currentIcon()) }}></span>`;
 }
 
 // Width of an element in CSS pixels, kept current, for charts drawn in real pixels.

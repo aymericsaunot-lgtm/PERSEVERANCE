@@ -15,6 +15,7 @@ import { ProgressView, SideLevel, LevelUp } from './views/progress.js';
 import { StudioShell, EditionChooser } from './views/studio/shell.js';
 import { progressOf, archivePatch } from './lib/xp.js';
 import { todayISO } from './lib/dates.js';
+import { applyAppIcon, setCurrentIcon, currentIcon, defaultIcon } from './icons.js';
 
 const EDITION_KEY = 'dash.edition';
 const cachedEdition = () => { try { return localStorage.getItem(EDITION_KEY) || ''; } catch (e) { return ''; } };
@@ -27,6 +28,7 @@ function showEdition(edition) {
 
 applyTheme(getTheme());
 document.documentElement.dataset.edition = cachedEdition() || 'research';
+applyAppIcon(currentIcon(), cachedEdition() || 'research');
 
 const NAV = [
   { id: 'today', label: 'Today', icon: 'today' },
@@ -140,7 +142,7 @@ function Shell({ state, p, route, install, onSignOut }) {
 
   return html`<div class="shell">
     <nav class="sidebar" aria-label="Sections">
-      <div class="sidebar__brand"><${Mark} size=${30} />${config.appName || 'Dashboard'}</div>
+      <div class="sidebar__brand"><${Mark} size=${30} />${config.appName || 'Perceverance'}</div>
       ${NAV.map((n) => html`<button key=${n.id} class="sidebar__item" aria-current=${active === n.id ? 'page' : undefined} onClick=${() => go(n.id)}>
         <${Icon} name=${n.icon} size="sm" />${n.label}
         ${counts[n.id] > 0 && html`<span class="sidebar__count">${counts[n.id]}</span>`}
@@ -175,6 +177,9 @@ function Space({ state, edition, onSignOut }) {
   const p = progressOf(state.data);
   const [levelUp, closeLevelUp] = useProgressKeeping(state, p);
   useEffect(() => { showEdition(edition); }, [edition]);
+  const icon = state.data.settings.appIcon || defaultIcon(edition);
+  setCurrentIcon(icon);
+  useEffect(() => { applyAppIcon(icon, edition); }, [icon, edition]);
   // The original account had no space saved: record Research once its data has arrived.
   useEffect(() => {
     if (!state.data.settings.edition && edition === 'research' && settled(state)) actions.saveSettings({ edition: 'research' });

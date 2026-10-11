@@ -1,0 +1,32 @@
+name: Notifications
+
+# Every 10 minutes: sends the phone notifications that are due (scripts/notify.py).
+# GitHub may start a scheduled run a few minutes late; the script allows for it.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notify
+  cancel-in-progress: false
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install --quiet -r scripts/requirements.txt
+      - name: Send what is due
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+        run: .venv/bin/python scripts/notify.py

@@ -139,6 +139,8 @@
 [data-edition="studio"] .tabbar__item[aria-current="page"]::before { display: none; }
 [data-edition="studio"] .tabbar__item[aria-current="page"] .tabbar__icon { background: var(--pink); border-radius: 999px; padding: 2px 14px; margin: -2px -14px; }
 [data-edition="studio"] .tabbar__badge { background: var(--danger); color: #FFFFFF; }
+[data-edition="studio"] .switch[aria-checked="true"] i { background: var(--pink); }
+[data-edition="studio"] .icon-choice { border-radius: 16px; }
 
 /* Top bar */
 .s-bar {
@@ -314,6 +316,24 @@ button.stage:hover { opacity: 1; }
 .counter__value { min-width: 1.6ch; text-align: center; font-size: 32px; font-weight: 800; letter-spacing: -0.04em; }
 .client-head { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
 .quick-sport { display: flex; align-items: center; gap: 10px; padding: 0 16px 14px; font-size: 12.5px; }
+
+/* Overnight fast: a lilac block, the hours as a strip; it turns mint when she can eat */
+.fast { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px 16px; border-radius: 10px; background: #E2D6FF; color: #121212; }
+.fast--done { background: #BAFFD0; }
+.fast .s-label { color: rgba(18, 18, 18, 0.72); }
+.fast__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; }
+.fast__big { font-size: 46px; font-weight: 800; line-height: 1; letter-spacing: -0.045em; }
+.fast__big small { margin-left: 2px; font-size: 16px; font-weight: 600; letter-spacing: -0.02em; opacity: 0.6; }
+.fast__hours { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; }
+.fast__hours i { height: 14px; border-radius: 4px; background: rgba(18, 18, 18, 0.13); }
+.fast__hours i.on { background: #121212; }
+.fast__hours i.part { background: linear-gradient(90deg, #121212 var(--p, 50%), rgba(18, 18, 18, 0.13) 0); }
+.fast__meta { font-family: var(--font-mono); font-size: 12px; color: rgba(18, 18, 18, 0.72); }
+.fast__meta b { color: #121212; font-weight: 500; }
+.fast__line { font-size: 15px; }
+.fast__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+.fast__row--quiet { font-size: 13px; color: rgba(18, 18, 18, 0.72); }
+.fast__streak { padding: 3px 9px; border-radius: 999px; background: #FFFFFF; font-family: var(--font-mono); font-size: 11px; }
 
 /* First sign-in: which space is this? */
 .chooser { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: #F8F8F4; color: #121212; font-family: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif; }

@@ -28,7 +28,9 @@ import json
 import math
 import os
 import re
+import subprocess
 import sys
+import time
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -289,7 +291,7 @@ def plan(now_utc, settings, log, src, forecast=None):
             fasting = [f for f in src.list("fasts") if not f.get("end") and f.get("start")]
             if fasting:
                 f = max(fasting, key=lambda f: f["start"])
-                done_at = f["start"] + float(f.get("target") or settings.get("fastHours") or 12) * HOUR_MS
+                done_at = f["start"] + float(f.get("target") or settings.get("fastHours") or 14) * HOUR_MS
                 if done_at > now_ms:
                     brief.append(f"Fasting: you can eat from {clock(done_at, tz)}.")
         else:
@@ -399,7 +401,7 @@ def plan(now_utc, settings, log, src, forecast=None):
         for f in src.list("fasts"):
             if f.get("end") or not f.get("start") or f.get("notifiedAt"):
                 continue
-            hours = float(f.get("target") or settings.get("fastHours") or 12)
+            hours = float(f.get("target") or settings.get("fastHours") or 14)
             done_at = f["start"] + hours * HOUR_MS
             if done_at <= now_ms < done_at + FAST_STALE_MS:
                 p.send(f"fast:{f['id']}", f"{hours:g} hours done. You can eat.",
@@ -461,11 +463,13 @@ class FirestoreSource:
         return snap.to_dict() if snap.exists else None
 
 
-def run_user(ref, now, key, subject, dry_run, label="account"):
+def run_user(ref, now, key, subject, dry_run, label="account", report=False):
     from pywebpush import WebPushException, webpush
 
     devices = [{**(s.to_dict() or {}), "id": s.id} for s in ref.collection("devices").stream()]
     devices = [d for d in devices if d.get("endpoint") and (d.get("keys") or {}).get("p256dh")]
+    if report:  # once per run: how many devices have notifications on (no names)
+        print(f"  [{label}] {plural(len(devices), 'device')} with notifications on")
     if not devices:
         return
     src = FirestoreSource(ref)
@@ -535,6 +539,8 @@ def main():
     ap = argparse.ArgumentParser(description="Send the notifications that are due.")
     ap.add_argument("--dry-run", action="store_true", help="print what would be sent; send and write nothing")
     ap.add_argument("--self-test", action="store_true", help="check the rules on sample data, offline")
+    ap.add_argument("--loop", type=int, default=0, help="stay on duty this many minutes instead of checking once")
+    ap.add_argument("--every", type=int, default=5, help="minutes between checks with --loop")
     args = ap.parse_args()
     if args.self_test:
         return self_test()
@@ -549,15 +555,55 @@ def main():
     from firebase_admin import credentials, firestore
     firebase_admin.initialize_app(credentials.Certificate(json.loads(raw)))
     db = firestore.client()
-    now = datetime.now(timezone.utc)
     subject = vapid_subject()
-    users = list(db.collection("users").list_documents())
-    print(f"{now:%Y-%m-%d %H:%M} UTC, {plural(len(users), 'account')}")
-    for n, ref in enumerate(users, 1):
-        try:
-            run_user(ref, now, key, subject, args.dry_run, label=f"account {n}")
-        except Exception as e:  # one account must not stop the others; no message text in a public log
-            print(f"::warning::account {n}: {type(e).__name__}" + (f": {e}" if args.dry_run else ""))
+    state = {}
+    started = time.monotonic()
+    first = True
+    while True:
+        now = datetime.now(timezone.utc)
+        users = list(db.collection("users").list_documents())
+        print(f"{now:%Y-%m-%d %H:%M} UTC, {plural(len(users), 'account')}", flush=True)
+        for n, ref in enumerate(users, 1):
+            try:
+                run_user(ref, now, key, subject, args.dry_run, label=f"account {n}", report=first)
+            except Exception as e:  # one account must not stop the others; no message text in a public log
+                print(f"::warning::account {n}: {type(e).__name__}" + (f": {e}" if args.dry_run else ""))
+        if not args.dry_run:
+            arxiv_daily(db, now, state)
+        first = False
+        # --loop: stay on duty, waking on every --every-minute mark, until the time is up.
+        step = max(1, args.every) * 60
+        wait = step - time.time() % step
+        if not args.loop or time.monotonic() - started + wait > args.loop * 60:
+            break
+        sys.stdout.flush()
+        time.sleep(wait)
+
+
+def arxiv_daily(db, now, state):
+    """The arXiv watch, once a day after 05:00 UTC (the listings are out by then). GitHub's own
+    schedule for it skipped days, so the notification loop runs it. Its output, which names
+    papers and keywords, stays out of the public log."""
+    uid = os.environ.get("DASHBOARD_UID", "").strip()
+    today = now.date().isoformat()
+    if not uid or now.hour < 5 or state.get("arxiv") == today or time.time() < state.get("arxiv_retry", 0):
+        return
+    snap = db.collection("users").document(uid).collection("meta").document("arxiv").get()
+    last = (snap.to_dict() or {}).get("lastRun") if snap.exists else None
+    if last and datetime.fromtimestamp(last / 1000, timezone.utc).date().isoformat() == today:
+        state["arxiv"] = today
+        return
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "arxiv_watch.py")
+    try:
+        r = subprocess.run([sys.executable, script], capture_output=True, timeout=900)
+        ok = r.returncode == 0
+    except subprocess.TimeoutExpired:
+        ok = False
+    print(f"  arXiv watch: {'done' if ok else 'failed, trying again in an hour'}", flush=True)
+    if ok:
+        state["arxiv"] = today
+    else:
+        state["arxiv_retry"] = time.time() + 3600
 
 
 # ---------------------------------------------------------------- self-test

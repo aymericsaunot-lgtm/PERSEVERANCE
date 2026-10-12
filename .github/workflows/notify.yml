@@ -1,32 +1,60 @@
 name: Notifications
 
-# Every 10 minutes: sends the phone notifications that are due (scripts/notify.py).
-# GitHub may start a scheduled run a few minutes late; the script allows for it.
+# GitHub drops most short scheduled runs (a 10-minute schedule ran 3 times in 16 hours), so
+# one run stays on duty for about 5 h 45, checking every 5 minutes (scripts/notify.py --loop),
+# and then starts the next run itself. The half-hourly schedule only restarts the chain if it
+# ever breaks; while a run is on duty, it stops after a few seconds.
+# The same loop runs the arXiv watch once a day.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "7,37 * * * *"
   workflow_dispatch:
+    inputs:
+      handover:
+        description: "Started by the previous run (skips the duty check)"
+        required: false
+        default: "0"
 
 permissions:
   contents: read
-
-concurrency:
-  group: notify
-  cancel-in-progress: false
+  actions: write
 
 jobs:
-  notify:
+  duty:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 2
+    outputs:
+      busy: ${{ steps.check.outputs.busy }}
+    steps:
+      - name: Is another run on duty?
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ inputs.handover }}" = "1" ]; then echo "busy=0" >> "$GITHUB_OUTPUT"; exit 0; fi
+          n=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow notify.yml --status in_progress --json databaseId --jq "[.[] | select(.databaseId != ${GITHUB_RUN_ID})] | length")
+          if [ "$n" -gt 0 ]; then echo "busy=1" >> "$GITHUB_OUTPUT"; echo "Another run is on duty."; else echo "busy=0" >> "$GITHUB_OUTPUT"; fi
+
+  notify:
+    needs: duty
+    if: needs.duty.outputs.busy != '1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 358
     steps:
       - uses: actions/checkout@v5
       - name: Install
         run: |
           python3 -m venv .venv
           .venv/bin/pip install --quiet -r scripts/requirements.txt
-      - name: Send what is due
+      - name: Send what is due, every 5 minutes
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
-        run: .venv/bin/python scripts/notify.py
+          DASHBOARD_UID: ${{ secrets.DASHBOARD_UID }}
+        run: .venv/bin/python scripts/notify.py --loop 345 --every 5
+      - name: Hand over to the next run
+        if: always() && !cancelled()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run notify.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f handover=1

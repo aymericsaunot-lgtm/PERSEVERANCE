@@ -20,7 +20,7 @@ export const DEFAULT_SETTINGS = {
   currency: 'EUR',
   paymentDays: 30,
   projectTypes: ['Branding', 'Logo', 'UI/UX', 'Web', 'Social media', 'Print', 'Packaging', 'Illustration'],
-  fastHours: 12,
+  fastHours: 14,
   // What the notification sender (scripts/notify.py) may send, and when, in this time zone.
   notify: {
     morning: true, morningAt: '08:00',

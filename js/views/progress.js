@@ -4,6 +4,7 @@ import { html, useState, useEffect } from '../../vendor/preact.js';
 import { actions } from '../store.js';
 import { Rich, Section, Sheet, PageHead, Empty, useWidth } from '../ui.js';
 import { todayISO, daysBetween, fmtDate, fmtShort, parseISO } from '../lib/dates.js';
+import { XP } from '../lib/xp.js';
 
 const fmt = (n) => Math.round(n).toLocaleString('en-GB');
 const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
@@ -120,7 +121,41 @@ function WeekChart({ weeks }) {
 const KIND = {
   task: 'Task', deadline: 'Deadline', beamtime: 'Beamtime', thesis: 'Thesis', paper: 'Paper read', sport: 'Sport', habit: 'Habit', bonus: 'Bonus',
   project: 'Project delivered', time: 'Hours', client: 'New client', quote: 'Quote accepted', sent: 'Invoice sent', paid: 'Invoice paid', fast: 'Fast',
+  added: 'Paper added', started: 'Paper started', quest: 'Daily quest', fullday: 'Full day',
 };
+
+// Today's four quests, one per attribute; all four make a Full day.
+export function QuestList({ p }) {
+  const done = p.quests.filter((q) => q.done).length;
+  return html`<div class="group quests">
+    ${p.quests.map((q) => {
+      const attr = p.attrs.find((a) => a.id === q.attr);
+      return html`<div key=${q.id} class=${'row quest' + (q.done ? ' quest--done' : '')}>
+        <span class=${'quest__check spot--' + q.attr} aria-hidden="true">${q.done ? '✓' : ''}</span>
+        <div class="row__main">
+          <div class="row__title">${q.title}</div>
+          <div class="row__sub">${attr ? attr.label : ''}${q.hint ? `, ${q.hint}` : ''}</div>
+        </div>
+        <span class="xp-gain">${q.done ? 'Done' : `+${XP.quest}`}</span>
+      </div>`;
+    })}
+    <div class=${'quest-foot' + (p.fullDayToday ? ' quest-foot--done' : '')}>
+      ${p.fullDayToday ? 'Full day! +10 XP to every attribute' : `${done} of ${p.quests.length} quests. All four make a Full day: +10 to every attribute`}
+    </div>
+  </div>`;
+}
+
+function Badges({ badges }) {
+  const earned = badges.filter((b) => b.earned).length;
+  return html`<div class="badges" aria-label=${`${earned} of ${badges.length} badges earned`}>
+    ${badges.map((b) => html`<div key=${b.id} class=${'badge' + (b.earned ? ' badge--earned' : '')} title=${b.desc}>
+      <span class="badge__medal" aria-hidden="true">${b.earned ? '★' : '☆'}</span>
+      <span class="badge__title">${b.title}</span>
+      <span class="badge__desc">${b.desc}</span>
+      ${!b.earned && b.of > 1 && html`<span class="bar" style="margin-top:8px"><span class="bar__fill" style=${`display:block;width:${Math.round((b.n / b.of) * 100)}%`}></span></span>`}
+    </div>`)}
+  </div>`;
+}
 
 function whenLabel(day) {
   const n = daysBetween(day, todayISO());
@@ -163,7 +198,7 @@ export function ProgressView({ state, p }) {
       <div class="prog-hero__main">
         <div class="prog-hero__num" aria-hidden="true">${p.level}</div>
         <div>
-          <div class="prog-hero__name">Level ${inWords(p.level)}</div>
+          <div class="prog-hero__name">Level ${inWords(p.level)}, ${p.title}</div>
           <div class="prog-hero__xp">${fmt(p.into)} of ${fmt(p.step)} XP, ${fmt(p.next - p.total)} to level ${p.level + 1}</div>
         </div>
       </div>
@@ -174,6 +209,8 @@ export function ProgressView({ state, p }) {
       <div class="stat"><div class="stat__value">${fmt(p.weekXP)}</div><div class="stat__label">This week${delta != null ? `, ${delta >= 0 ? '+' : ''}${delta}% on last` : ''}</div></div>
       <div class="stat"><div class="stat__value">${p.goalStreak}</div><div class="stat__label">${p.goalStreak === 1 ? 'Day' : 'Days'} in a row at goal</div></div>
     </div>
+
+    <${Section} title="Today’s quests" meta=${`${p.quests.filter((q) => q.done).length} of ${p.quests.length}`}><${QuestList} p=${p} /></${Section}>
 
     <${Section} title="Attributes" meta="This week">
       <div class="attr-grid">
@@ -203,6 +240,7 @@ export function ProgressView({ state, p }) {
         </div>
       </${Section}>
     </div>
+    <${Section} title="Badges" meta=${`${p.badges.filter((b) => b.earned).length} of ${p.badges.length}`}><${Badges} badges=${p.badges} /></${Section}>
     ${rules && html`<${RulesSheet} goal=${p.goal} rules=${p.rules} onClose=${() => setRules(false)} />`}
   </div>`;
 }

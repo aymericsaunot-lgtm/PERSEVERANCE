@@ -6,7 +6,7 @@ import { ReadingStats, PaperSheet } from './papers.js';
 import { authorShort } from '../lib/papers.js';
 import { Horizon, NextUp, thesisProgress, upcoming } from './phd.js';
 import { HabitChips, SurfHero, useSurf } from './life.js';
-import { TodayGauge, LevelCard, LevelLink, inWords } from './progress.js';
+import { TodayGauge, LevelCard, LevelLink, QuestList, inWords } from './progress.js';
 
 function isoWeek(d) {
   const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -100,6 +100,9 @@ export function TodayView({ state, p, go }) {
         <div class="duo" style="--o:2">
           <${TodayGauge} p=${p} go=${go} />
           <${LevelCard} p=${p} go=${go} />
+        </div>
+        <div style="--o:3">
+          <${Section} title="Today’s quests" action=${html`<button class="link-btn" onClick=${() => go('progress')}>Progress</button>`}><${QuestList} p=${p} /></${Section}>
         </div>
         <div style="--o:4"><${SurfHero} settings=${settings} link=${true} /></div>
         <div style="--o:6">

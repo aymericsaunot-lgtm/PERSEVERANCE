@@ -1,10 +1,10 @@
 // Studio: overnight fasting. Log the end of dinner, and a timer runs until she can eat again
-// (12 hours by default, Settings can change it). The notification sender also uses `fasts`.
+// (14 hours by default, Settings can change it). The notification sender also uses `fasts`.
 import { html, useState, useEffect, useRef } from '../../../vendor/preact.js';
 import { actions, getState } from '../../store.js';
 import { Icon, toast } from '../../ui.js';
 import { XP } from '../../lib/xp.js';
-import { isoOf, addDays, todayISO, fmtDate } from '../../lib/dates.js';
+import { isoOf, addDays, todayISO, fmtDate, startOfWeek, parseISO, daysBetween } from '../../lib/dates.js';
 
 const HOUR = 3600000;
 const clock = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -43,7 +43,7 @@ export function fastStreak(fasts, hours, today = todayISO()) {
 
 export function FastCard({ state }) {
   const { fasts, settings } = state.data;
-  const hours = Number(settings.fastHours) || 12;
+  const hours = Number(settings.fastHours) || 14;
   const active = fasts.filter((f) => !f.end).sort((a, b) => b.start - a.start)[0] || null;
   const last = fasts.filter((f) => f.end).sort((a, b) => b.end - a.end)[0] || null;
   const [now, setNow] = useState(Date.now());
@@ -137,8 +137,62 @@ export function FastCard({ state }) {
   </section>`;
 }
 
+// The record: how many fasts reached their target this week, month and year, how long they
+// last, and the trend over 12 weeks and 6 months. A fast counts on the day it ends.
+export function FastRecord({ state }) {
+  const hours = Number(state.data.settings.fastHours) || 14;
+  const ended = state.data.fasts.filter((f) => f.end && f.start);
+  if (!ended.length) return null;
+  const today = todayISO();
+  const dayOf = (f) => isoOf(new Date(f.end));
+  const ok = (f) => f.end - f.start >= targetOf(f, hours);
+  const done = ended.filter(ok);
+  const monday = isoOf(startOfWeek(parseISO(today)));
+  const month = today.slice(0, 7);
+  const year = today.slice(0, 4);
+  const last30 = ended.filter((f) => dayOf(f) > addDays(today, -30));
+  const avg = last30.length ? last30.reduce((a, f) => a + (f.end - f.start), 0) / last30.length : 0;
+  const longest = ended.reduce((a, f) => Math.max(a, f.end - f.start), 0);
+  const rate = last30.length ? Math.round((last30.filter(ok).length / last30.length) * 100) : 0;
+  const nightsThisWeek = daysBetween(monday, today) + 1;
+
+  const weeks = Array.from({ length: 12 }, (_, i) => {
+    const start = addDays(monday, -7 * (11 - i));
+    const end = addDays(start, 6);
+    return { start, n: done.filter((f) => dayOf(f) >= start && dayOf(f) <= end).length, now: i === 11 };
+  });
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = parseISO(`${month}-01`);
+    d.setMonth(d.getMonth() - i);
+    const key = isoOf(d).slice(0, 7);
+    const all = ended.filter((f) => dayOf(f).startsWith(key));
+    const hit = all.filter(ok);
+    return { key, label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }), hit: hit.length, all: all.length, avg: all.length ? all.reduce((a, f) => a + (f.end - f.start), 0) / all.length : 0 };
+  }).filter((m) => m.all > 0);
+
+  const stats = [
+    [`${done.filter((f) => dayOf(f) >= monday).length}/${nightsThisWeek}`, `This week, at ${hours} h or more`],
+    [done.filter((f) => dayOf(f).startsWith(month)).length, 'This month'],
+    [done.filter((f) => dayOf(f).startsWith(year)).length, 'This year'],
+    [avg ? span(avg) : '–', 'Average, last 30 days'],
+    [longest ? span(longest) : '–', 'Longest fast'],
+    [`${rate}%`, 'On target, last 30 days'],
+  ];
+  return html`<div class="group">
+    <div class="fstats">${stats.map(([v, l]) => html`<div key=${l} class="fstat"><b>${v}</b><span>${l}</span></div>`)}</div>
+    <div class="fweeks" role="img" aria-label=${`Fasts on target per week, last 12 weeks: ${weeks.map((w) => w.n).join(', ')}`}>
+      ${weeks.map((w) => html`<div key=${w.start} class=${'fweek' + (w.now ? ' fweek--now' : '')}><span>${w.n || ''}</span><i style=${`height:${Math.round((w.n / 7) * 64)}px`}></i></div>`)}
+    </div>
+    <div class="fweeks-axis"><span>12 weeks ago</span><span>This week</span></div>
+    ${months.map((m) => html`<div key=${m.key} class="row">
+      <div class="row__main"><div class="row__title">${m.label}</div><div class="row__sub">${m.hit} of ${m.all} on target, average ${span(m.avg)}</div></div>
+      <span class="row__side">${m.hit}</span>
+    </div>`)}
+  </div>`;
+}
+
 export function FastHistory({ state }) {
-  const hours = Number(state.data.settings.fastHours) || 12;
+  const hours = Number(state.data.settings.fastHours) || 14;
   const list = state.data.fasts.filter((f) => f.end).sort((a, b) => b.end - a.end).slice(0, 10);
   if (!list.length) return null;
   return html`<div class="group">

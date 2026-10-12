@@ -19,7 +19,7 @@ The look is a printed almanac: paper and ink with one orange, Instrument Serif f
 The app has two spaces, and each account shows its own:
 
 - **Research** (yours): everything above.
-- **Studio**, for a freelance designer: Today, Projects (lead, brief, design, feedback, delivered, with tasks, hours, revision rounds and the real hourly rate), Clients, Money (quotes and invoices, paid, waiting and overdue, income per month), an overnight fasting timer (12 hours after dinner), Life (habits and sport, boxing by default) and the level system. Bold pastel look: Schibsted Grotesk and DM Mono, colour blocks for projects.
+- **Studio**, for a freelance designer: Today, Projects (lead, brief, design, feedback, delivered, with tasks, hours, revision rounds and the real hourly rate), Clients, Money (quotes and invoices, paid, waiting and overdue, income per month), an overnight fasting timer (14 hours after dinner) with a weekly, monthly and yearly record, Life (habits and sport, boxing by default) and the level system. Bold pastel look: Schibsted Grotesk and DM Mono, colour blocks for projects.
 
 Each account only ever sees its own data; the Firestore rules enforce it. Your account is recorded as Research automatically the first time the new version opens, because it already holds your data. A brand-new account is asked once, on first sign-in, which space it is. Either can switch later in Settings, Space.
 
@@ -196,7 +196,7 @@ python3 scripts/notify.py --self-test
 - **Surf**: Settings, Surf spot. The default is Hendaye with the beach facing NNW (340°); wind counts as offshore when it blows from the opposite side. The quality bars are a rough guide.
 - **Backups**: Settings, Your data, Export backup. One JSON file with everything; Import restores it into any account.
 - **App icon**: Settings, App icon. There are four designs: Sunset, Tide, P. and Blocks. The app and the browser tab change at once. A phone keeps the icon the app had when it was added, so remove the app from the Home Screen, open the link in the browser, sign in, and add it again; your data stays. Signing in first matters: before sign-in the page shows the default icon. To change a design, edit its SVG in `js/icons.js` (64 by 64) and replace its three PNGs in `icons/` (`<name>-180.png` for iPhone, `-192` and `-512` for Android). To add one, add an entry there and its three PNGs.
-- **Fasting** (Studio): after dinner, tap **Dinner done, start 12 h** on Today. The card counts down and shows when she can eat. If she forgot, she types the time dinner ended. In the morning she taps **I ate**. A fast of 12 hours or more earns 15 XP and adds to the streak. The length is in Settings, Fasting.
+- **Fasting** (Studio): after dinner, tap **Dinner done, start 14 h** on Today. The card counts down and shows when she can eat. If she forgot, she types the time dinner ended. In the morning she taps **I ate**. A fast that reaches its target earns 15 XP and adds to the streak. Life shows the record: this week, this month, this year, the average and longest fast, and the last 12 weeks. The length is in Settings, Fasting.
 
 ## Free quota
 

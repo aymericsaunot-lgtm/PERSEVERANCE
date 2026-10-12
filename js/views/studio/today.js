@@ -6,11 +6,11 @@ import { todayISO, daysBetween, isoOf, startOfWeek, fmtDate } from '../../lib/da
 import { sportXP } from '../../lib/xp.js';
 import { TaskRow, TaskSheet, QuickAddTask, todayTasks } from '../tasks.js';
 import { HabitChips, HabitList, SportLog } from '../life.js';
-import { inWords } from '../progress.js';
+import { inWords, QuestList } from '../progress.js';
 import { money, hoursOf, dueText, invoiceState, STATE_LABEL, byDue } from './common.js';
 import { ProjectCard } from './projects.js';
 import { ProjectSheet, InvoiceSheet } from './sheets.js';
-import { FastCard, FastHistory } from './fasting.js';
+import { FastCard, FastHistory, FastRecord } from './fasting.js';
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -73,6 +73,9 @@ export function StudioToday({ state, p, go }) {
       </div>
       <div class="bento__col">
         <div style="--o:2"><${FastCard} state=${state} /></div>
+        <div style="--o:2">
+          <${Section} title="Today’s quests" action=${html`<button class="link-btn" onClick=${() => go('progress')}>Progress</button>`}><${QuestList} p=${p} /></${Section}>
+        </div>
         <div style="--o:4">
           <${Section} title="Money" action=${html`<button class="link-btn" onClick=${() => go('money')}>All</button>`}>
             <div class="group">
@@ -115,6 +118,7 @@ export function StudioLife({ state }) {
     <div class="grid-2">
       <div class="stack">
         <div class="section"><${FastCard} state=${state} /></div>
+        ${state.data.fasts.some((f) => f.end) && html`<${Section} title="Fasting record"><${FastRecord} state=${state} /></${Section}>`}
         ${state.data.fasts.some((f) => f.end) && html`<${Section} title="Recent fasts"><${FastHistory} state=${state} /></${Section}>`}
         <${HabitList} habits=${state.data.habits} />
       </div>

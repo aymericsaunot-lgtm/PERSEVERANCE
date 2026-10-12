@@ -18,7 +18,7 @@ const NOTIFY_STUDIO = [
   ['morning', 'Morning brief', 'Today’s tasks, what is due, money to chase', 'morningAt'],
   ['projects', 'Project deadlines', 'The day before and the day a project is due'],
   ['invoices', 'Invoices and quotes', 'An invoice turns overdue; a quote waits a week without an answer'],
-  ['fasting', 'Fasting', 'When your 12 hours are done'],
+  ['fasting', 'Fasting', 'When your fasting hours are done'],
   ['evening', 'Habits in the evening', 'What is left to tick, only if something is', 'eveningAt'],
 ];
 
@@ -64,7 +64,7 @@ function Notifications({ settings, devices }) {
     ${iosNeedsHome && html`<div class="notice" style="margin:0 16px 14px"><${Icon} name="info" size="sm" />
       <p>On iPhone, notifications only work in the app on your Home Screen. In Safari, tap Share, then Add to Home Screen. Open the app from there, come back to Settings and tap Turn on.</p></div>`}
     ${rows.map(([key, title, sub, timeKey]) => html`<div key=${key} class="row">
-      <div class="row__main"><div class="row__title">${title}</div><div class="row__sub">${key === 'fasting' ? `When your ${Number(settings.fastHours) || 12} hours are done` : sub}</div></div>
+      <div class="row__main"><div class="row__title">${title}</div><div class="row__sub">${key === 'fasting' ? `When your ${Number(settings.fastHours) || 14} hours are done` : sub}</div></div>
       ${timeKey && n[key] !== false && html`<input class="input input--time" type="time" aria-label=${`${title} time`} value=${n[timeKey]} onChange=${(e) => e.currentTarget.value && set({ [timeKey]: e.currentTarget.value })} />`}
       <${Switch} on=${n[key] !== false} label=${title} onChange=${(v) => set({ [key]: v })} />
     </div>`)}
@@ -249,7 +249,7 @@ export function SettingsView({ state, sub, install, onSignOut }) {
         </${Section}>
         <${Section} title="Fasting">
           <div class="group group--pad">
-            <${Segmented} label="Hours between dinner and the next meal" value=${String(Number(s.fastHours) || 12)} onChange=${(h) => actions.saveSettings({ fastHours: Number(h) })} items=${[12, 13, 14, 16].map((h) => ({ id: String(h), label: `${h} h` }))} />
+            <${Segmented} label="Hours between dinner and the next meal" value=${String(Number(s.fastHours) || 14)} onChange=${(h) => actions.saveSettings({ fastHours: Number(h) })} items=${[12, 13, 14, 16].map((h) => ({ id: String(h), label: `${h} h` }))} />
             <p class="field__hint" style="margin-top:10px">A fast already running keeps the length it started with.</p>
           </div>
         </${Section}>`}

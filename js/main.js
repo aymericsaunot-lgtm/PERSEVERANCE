@@ -1,6 +1,6 @@
 // Entry point: Firebase sign-in, then the space of whoever signed in: Research or Studio.
 // There is no way in without a password, and each account only ever sees its own data.
-import { html, render, useState, useEffect } from '../vendor/preact.js';
+import { html, render, useState, useEffect, useRef } from '../vendor/preact.js';
 import { config } from '../config.js';
 import { attachBackend, getBackend, setStatus, useStore, getState, dataReady, actions } from './store.js';
 import { Icon, Mark, Toasts, toast } from './ui.js';
@@ -13,7 +13,7 @@ import { SettingsView, applyTheme, getTheme } from './views/settings.js';
 import { LoginView, SetupView } from './views/login.js';
 import { ProgressView, SideLevel, LevelUp } from './views/progress.js';
 import { StudioShell, EditionChooser } from './views/studio/shell.js';
-import { progressOf, archivePatch } from './lib/xp.js';
+import { progressOf, archivePatch, XP } from './lib/xp.js';
 import { todayISO } from './lib/dates.js';
 import { applyAppIcon, setCurrentIcon, currentIcon, defaultIcon } from './icons.js';
 import { disablePush } from './push.js';
@@ -121,6 +121,21 @@ function useProgressKeeping(state, p) {
     const patch = archivePatch(state.data, today);
     if (patch) actions.saveMeta('progress', patch);
   }, [ready, state.data.progress, today]);
+  // Quests and badges: keep earned badges, and cheer what was just reached (not on load).
+  const seen = useRef(null);
+  useEffect(() => {
+    if (!ready) return;
+    const now = { day: today, quests: p.quests.filter((q) => q.done).map((q) => q.id), full: p.fullDayToday, badges: p.badges.filter((b) => b.earned).map((b) => b.id) };
+    const prev = seen.current;
+    seen.current = now;
+    const kept = (state.data.progress && state.data.progress.badges) || {};
+    const fresh = p.badges.filter((b) => b.earned && !kept[b.id]);
+    if (fresh.length) actions.saveMeta('progress', { badges: { ...kept, ...Object.fromEntries(fresh.map((b) => [b.id, today])) } });
+    if (!prev || prev.day !== today) return;
+    for (const q of p.quests) if (q.done && !prev.quests.includes(q.id)) toast(`Quest done: ${q.title}`, { xp: XP.quest, ms: 2800 });
+    if (now.full && !prev.full) toast('Full day! Every quest done', { xp: XP.fullDay * 4, ms: 3400 });
+    for (const b of p.badges) if (b.earned && !prev.badges.includes(b.id)) toast(`Badge earned: ${b.title}`, { ms: 3400 });
+  }, [ready, p]);
   return [levelUp, () => setLevelUp(0)];
 }
 

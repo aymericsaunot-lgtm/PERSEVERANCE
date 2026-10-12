@@ -1,9 +1,8 @@
 name: arXiv watch
 
-# Weekday mornings, shortly after arXiv publishes the new listings (times are UTC).
+# By hand only. The daily check runs inside the Notifications workflow (scripts/notify.py),
+# every day after 05:00 UTC, because GitHub skipped the scheduled runs of this one.
 on:
-  schedule:
-    - cron: "23 5 * * 1-5"
   workflow_dispatch:
 
 permissions:

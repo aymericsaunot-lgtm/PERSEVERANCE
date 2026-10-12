@@ -950,6 +950,34 @@ a.tile-btn { text-decoration: none; }
 .icon-choice[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
 .icon-choice .mark { box-shadow: 0 0 0 1px var(--rule); }
 
+/* Daily quests */
+.quest__check { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border: 1.5px solid var(--spot); color: var(--sheet); font-size: 13px; font-weight: 700; }
+.quest--done .quest__check { background: var(--spot); }
+.quest--done .row__title { text-decoration: line-through; text-decoration-color: var(--ink-3); color: var(--ink-2); }
+.quest-foot { padding: 10px 16px 12px; border-top: 1px solid var(--rule); font-size: 12.5px; color: var(--ink-2); }
+.quest-foot--done { color: var(--ink); font-weight: 600; background: var(--accent-soft); }
+
+/* Badges */
+.badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.badge { display: flex; flex-direction: column; gap: 2px; padding: 12px 14px; background: var(--sheet); border-radius: var(--r-panel); color: var(--ink-3); }
+.badge__medal { font-size: 22px; line-height: 1; margin-bottom: 4px; }
+.badge__title { font-weight: 600; font-size: 14px; }
+.badge__desc { font-size: 12px; }
+.badge--earned { color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.badge--earned .badge__medal { color: var(--accent); }
+
+/* Fasting record */
+.fstats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--rule); }
+@media (min-width: 700px) { .fstats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.fstat { padding: 12px 14px; background: var(--sheet); }
+.fstat b { display: block; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.fstat span { font-size: 12px; color: var(--ink-2); }
+.fweeks { display: flex; align-items: flex-end; gap: 6px; height: 96px; padding: 14px 16px 0; }
+.fweek { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; font-size: 10.5px; color: var(--ink-3); }
+.fweek i { display: block; width: 100%; max-width: 26px; min-height: 2px; background: var(--ink); border-radius: 3px 3px 0 0; }
+.fweek--now i { background: var(--accent); }
+.fweeks-axis { display: flex; justify-content: space-between; padding: 6px 16px 12px; font-size: 11.5px; color: var(--ink-3); }
+
 /* Settings */
 .settings-list .row { min-height: 56px; }
 .code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; background: var(--paper); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -21,11 +21,13 @@ export const DEFAULT_SETTINGS = {
   paymentDays: 30,
   projectTypes: ['Branding', 'Logo', 'UI/UX', 'Web', 'Social media', 'Print', 'Packaging', 'Illustration'],
   fastHours: 14,
+  // People to share tasks with: [{uid, handle}], added by @handle in Settings, Friends.
+  friends: [],
   // What the notification sender (scripts/notify.py) may send, and when, in this time zone.
   notify: {
     morning: true, morningAt: '08:00',
     evening: true, eveningAt: '21:00',
-    deadlines: true, arxiv: true, surf: true,
+    deadlines: true, arxiv: true, surf: true, shared: true,
     projects: true, invoices: true, fasting: true,
     tz: '',
   },
@@ -38,6 +40,7 @@ const state = {
     settings: DEFAULT_SETTINGS,
     arxivStatus: null,
     progress: null,
+    profile: null,
   },
   loaded: new Set(),
   status: { mode: null, sync: 'synced', error: null, user: null },
@@ -119,13 +122,19 @@ export function dataReady(s = state) {
   return s.loaded.has('settings') && COLLECTIONS.every((c) => s.loaded.has(c));
 }
 
+// profiles/{uid}: this account's @handle, so friends can find it.
+export function setProfile(doc) {
+  state.data = { ...state.data, profile: doc || null };
+  notify();
+}
+
 export function setStatus(patch) {
   state.status = { ...state.status, ...patch };
   notify();
 }
 
 export function resetData() {
-  state.data = { ...state.data, tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [], projects: [], clients: [], invoices: [], timelogs: [], fasts: [], devices: [], settings: DEFAULT_SETTINGS, arxivStatus: null, progress: null };
+  state.data = { ...state.data, tasks: [], papers: [], arxiv: [], beamtimes: [], deadlines: [], chapters: [], sessions: [], habits: [], projects: [], clients: [], invoices: [], timelogs: [], fasts: [], devices: [], settings: DEFAULT_SETTINGS, arxivStatus: null, progress: null, profile: null };
   state.loaded = new Set();
   notify();
 }
@@ -162,6 +171,22 @@ export const actions = {
   // Merge into meta/{id}, e.g. 'progress'.
   saveMeta(id, patch) {
     backend.saveMeta(id, clean(patch));
+  },
+  // A new task shared with friends ([{uid, handle}]).
+  addShared(obj, friends) {
+    const id = uid();
+    const me = (state.data.profile && state.data.profile.handle) || '';
+    backend.addShared(id, clean({ ...obj, createdAt: obj.createdAt ?? Date.now() }), friends, me);
+    return id;
+  },
+  isOwner(id) {
+    return backend.isOwner(id);
+  },
+  findProfile(handle) {
+    return backend.findProfile(handle);
+  },
+  saveProfile(handle) {
+    return backend.saveProfile(handle);
   },
   toggleHabitDay(habit, date) {
     const on = !(habit.days || []).includes(date);

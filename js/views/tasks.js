@@ -1,5 +1,5 @@
 import { html, useState, useMemo, useEffect } from '../../vendor/preact.js';
-import { actions } from '../store.js';
+import { actions, getState } from '../store.js';
 import { Icon, Check, Section, Segmented, Sheet, Field, Empty, DatePick, DangerButton, PageHead, toast } from '../ui.js';
 import { todayISO, addDays, relDays, fmtDate, daysBetween, isoOf } from '../lib/dates.js';
 import { XP } from '../lib/xp.js';
@@ -18,6 +18,25 @@ export function dueInfo(due, today = todayISO()) {
   if (n === 1) return { text: 'Tomorrow', cls: 'due' };
   if (n < 7) return { text: fmtDate(due).split(' ')[0], cls: 'due' };
   return { text: fmtDate(due), cls: 'due' };
+}
+
+const myUid = () => (getState().status.user || {}).uid;
+const friendsOf = () => getState().data.settings.friends || [];
+
+// The other people on a shared task, as @handles.
+export function sharedWith(task) {
+  const me = myUid();
+  return Object.entries(task.people || {}).filter(([u]) => u !== me && (task.members || []).includes(u)).map(([, h]) => '@' + (h || 'friend'));
+}
+
+function FriendChips({ value, onChange }) {
+  const friends = friendsOf();
+  if (!friends.length) return null;
+  return friends.map((f) => {
+    const on = value.includes(f.uid);
+    return html`<button type="button" key=${f.uid} class="chip" aria-pressed=${on ? 'true' : 'false'}
+      onClick=${() => onChange(on ? value.filter((u) => u !== f.uid) : [...value, f.uid])}>@${f.handle}</button>`;
+  });
 }
 
 export function completeTask(task) {
@@ -40,23 +59,31 @@ export function TaskRow({ task, areas, onOpen, showArea = true, project = null }
         ${!project && showArea && task.area && html`<span class="dot" style=${`background:${areaColor(task.area, areas)}`}></span><span>${task.area}</span>`}
         ${task.notes && html`<${Icon} name="edit" size="xs" />`}
       </div>` : null}
+      ${task.shared && html`<div class="row__sub">${task.doneByOther ? `Done by ${'@' + ((task.people || {})[task.doneBy] || 'friend')}` : `With ${sharedWith(task).join(', ') || 'nobody now'}`}</div>`}
     </div>
     ${task.starred && !task.done && html`<span class="faint" aria-label="Starred" style="color:var(--warn);display:flex"><${Icon} name="star" size="xs" cls="filled" /></span>`}
     ${due && html`<span class=${due.cls}>${due.text}</span>`}
   </div>`;
 }
 
-function parseQuick(text, areas) {
+// #Area sets the area, @handle shares with that friend, a trailing ! stars it.
+function parseQuick(text, areas, friends = []) {
   let title = text.trim();
   let area = null;
   let starred = false;
+  const with_ = [];
+  title = title.replace(/(^|\s)@([\p{L}\p{N}_.-]+)/gu, (m, sp, h) => {
+    const hit = friends.find((f) => f.handle === h.toLowerCase().replace(/\.$/, ''));
+    if (hit) { if (!with_.includes(hit.uid)) with_.push(hit.uid); return sp; }
+    return m;
+  });
   title = title.replace(/(^|\s)#([\p{L}\p{N}_-]+)/gu, (m, sp, tag) => {
     const hit = areas.find((a) => a.toLowerCase().replace(/\s+/g, '') === tag.toLowerCase());
     if (hit) { area = hit; return sp; }
     return m;
   });
   if (/\s!$|^!|\s\*$/.test(title)) { starred = true; title = title.replace(/\s*[!*]$/, '').replace(/^!\s*/, ''); }
-  return { title: title.replace(/\s+/g, ' ').trim(), area, starred };
+  return { title: title.replace(/\s+/g, ' ').trim(), area, starred, with: with_ };
 }
 
 export function QuickAddTask({ areas, defaultDue = '', placeholder = 'Add a task', compact = false, projectId = '' }) {
@@ -64,16 +91,24 @@ export function QuickAddTask({ areas, defaultDue = '', placeholder = 'Add a task
   const [area, setArea] = useState(areas[0] || '');
   const [due, setDue] = useState(defaultDue);
   const [starred, setStarred] = useState(false);
+  const [withF, setWithF] = useState([]);
   const [focused, setFocused] = useState(false);
   const today = todayISO();
   useEffect(() => setDue(defaultDue), [defaultDue]);
   const submit = (e) => {
     e.preventDefault();
-    const q = parseQuick(text, areas);
+    const friends = projectId ? [] : friendsOf();
+    const q = parseQuick(text, areas, friends);
     if (!q.title) return;
-    actions.add('tasks', { title: q.title, area: projectId ? '' : q.area || area, due, starred: starred || q.starred, done: false, doneAt: null, notes: '', ...(projectId ? { projectId } : {}) });
+    const task = { title: q.title, area: projectId ? '' : q.area || area, due, starred: starred || q.starred, done: false, doneAt: null, notes: '', ...(projectId ? { projectId } : {}) };
+    const people = friends.filter((f) => withF.includes(f.uid) || q.with.includes(f.uid));
+    if (people.length) {
+      actions.addShared({ ...task, doneBy: null }, people);
+      toast(`Shared with ${people.map((f) => '@' + f.handle).join(', ')}`);
+    } else actions.add('tasks', task);
     setText('');
     setStarred(false);
+    setWithF([]);
   };
   const dueOpts = [['', 'No date'], [today, 'Today'], [addDays(today, 1), 'Tomorrow']];
   const showOpts = !compact || focused || text;
@@ -93,6 +128,7 @@ export function QuickAddTask({ areas, defaultDue = '', placeholder = 'Add a task
         <${Icon} name="calendar" size="xs" />${due && !dueOpts.some(([v]) => v === due) ? fmtDate(due) : 'Pick a date'}
       </${DatePick}>
       <button type="button" class="chip" aria-pressed=${starred ? 'true' : 'false'} onClick=${() => setStarred(!starred)}><${Icon} name="star" size="xs" />Star</button>
+      ${!projectId && html`<span style="width:6px"></span><${FriendChips} value=${withF} onChange=${setWithF} />`}
     </div>`}
   </form>`;
 }
@@ -101,18 +137,41 @@ export function TaskSheet({ task, areas, onClose }) {
   const [form, setForm] = useState({ title: task.title || '', notes: task.notes || '', area: task.area || '', due: task.due || '', starred: !!task.starred });
   const set = (k) => (e) => setForm({ ...form, [k]: e.currentTarget ? e.currentTarget.value : e });
   const today = todayISO();
+  const me = myUid();
+  const owner = !task.shared || actions.isOwner(task.id);
+  // Who it is shared with; only whoever created it (or a task not shared yet) can change that.
+  const [withF, setWithF] = useState((task.members || []).filter((u) => u !== me));
+  const canShare = owner && !task.projectId && friendsOf().length > 0;
   const save = () => {
     if (!form.title.trim()) return;
-    actions.update('tasks', task.id, { ...form, title: form.title.trim() });
+    const fields = { ...form, title: form.title.trim() };
+    const friends = friendsOf();
+    if (!task.shared && withF.length) {
+      // Sharing a personal task: it moves to the shared list.
+      const people = friends.filter((f) => withF.includes(f.uid));
+      actions.addShared({ ...fields, done: !!task.done, doneAt: task.doneAt || null, doneBy: task.done ? me : null, createdAt: task.createdAt }, people);
+      actions.remove('tasks', task.id);
+      toast(`Shared with ${people.map((f) => '@' + f.handle).join(', ')}`);
+    } else if (task.shared && owner) {
+      const kept = Object.fromEntries(Object.entries(task.people || {}).filter(([u]) => u === me || withF.includes(u)));
+      for (const f of friends) if (withF.includes(f.uid)) kept[f.uid] = f.handle;
+      const members = [me, ...withF];
+      const added = members.some((u) => !(task.members || []).includes(u));
+      actions.update('tasks', task.id, { ...fields, members, people: kept, ...(added ? { sharedAt: Date.now() } : {}) });
+    } else {
+      actions.update('tasks', task.id, fields);
+    }
     onClose();
   };
   const del = () => {
     actions.remove('tasks', task.id);
-    toast('Task deleted');
+    toast(owner ? 'Task deleted' : 'You left the task');
     onClose();
   };
-  return html`<${Sheet} title="Task" onClose=${onClose} actions=${html`
-      <${DangerButton} onConfirm=${del} />
+  const by = task.shared && !owner ? '@' + ((task.people || {})[task.owner] || 'friend') : '';
+  return html`<${Sheet} title=${task.shared ? 'Shared task' : 'Task'} onClose=${onClose} actions=${html`
+      ${owner ? html`<${DangerButton} onConfirm=${del} armedLabel=${task.shared ? 'Tap again: deletes it for everyone' : 'Tap again to delete'} />`
+        : html`<${DangerButton} onConfirm=${del} label="Leave" armedLabel="Tap again to leave" />`}
       <button class="btn btn--primary" onClick=${save}>Save</button>`}>
     <${Field} label="Title"><input class="input" data-autofocus value=${form.title} onInput=${set('title')} onKeyDown=${(e) => e.key === 'Enter' && save()} /></${Field}>
     <div class="field" style="margin-top:14px">
@@ -137,6 +196,12 @@ export function TaskSheet({ task, areas, onClose }) {
     <div style="margin-top:14px">
       <button class="chip" aria-pressed=${form.starred ? 'true' : 'false'} onClick=${() => setForm({ ...form, starred: !form.starred })}><${Icon} name="star" size="xs" />Starred tasks show on Today</button>
     </div>
+    ${canShare && html`<div class="field" style="margin-top:14px">
+      <span class="field__label">Share with</span>
+      <div class="chips"><${FriendChips} value=${withF} onChange=${setWithF} /></div>
+      <span class="field__hint">Both of you see it and either can tick it off. Whoever ticks it gets the XP.</span>
+    </div>`}
+    ${by && html`<p class="field__hint" style="margin-top:14px">Shared by ${by} with ${sharedWith(task).filter((h) => h !== by).concat('you').join(', ')}. Either of you can tick it off.</p>`}
   </${Sheet}>`;
 }
 

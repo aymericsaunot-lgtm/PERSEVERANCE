@@ -12,6 +12,7 @@ const NOTIFY_RESEARCH = [
   ['deadlines', 'Deadlines and beamtimes', 'A week and a day before a deadline, three days before a beamtime'],
   ['arxiv', 'New arXiv matches', 'After the weekday check, when something matched'],
   ['surf', 'Surf alert', 'Around 19:00, when tomorrow looks good or great'],
+  ['shared', 'Shared tasks', 'When a friend shares a new task with you'],
   ['evening', 'Habits in the evening', 'What is left to tick, only if something is', 'eveningAt'],
 ];
 const NOTIFY_STUDIO = [
@@ -19,6 +20,7 @@ const NOTIFY_STUDIO = [
   ['projects', 'Project deadlines', 'The day before and the day a project is due'],
   ['invoices', 'Invoices and quotes', 'An invoice turns overdue; a quote waits a week without an answer'],
   ['fasting', 'Fasting', 'When your fasting hours are done'],
+  ['shared', 'Shared tasks', 'When a friend shares a new task with you'],
   ['evening', 'Habits in the evening', 'What is left to tick, only if something is', 'eveningAt'],
 ];
 
@@ -76,6 +78,70 @@ function Notifications({ settings, devices }) {
     </div>`}
     ${on && html`<div class="row"><div class="row__main row__sub" style="margin:0">Times follow ${n.tz || 'this device’s time zone'}. GitHub sends them every 10 minutes or so, so allow a few minutes either side.</div>
       <button class="btn btn--sm" onClick=${test}>Send a test</button></div>`}
+  </div>`;
+}
+
+// Handles are lowercase: letters, digits, dots, dashes and underscores.
+const normHandle = (h) => String(h || '').trim().replace(/^@/, '').toLowerCase();
+const validHandle = (h) => /^[a-z0-9_.-]{2,24}$/.test(h);
+
+function Friends({ settings, profile }) {
+  const friends = settings.friends || [];
+  const mine = (profile && profile.handle) || '';
+  const [handle, setHandle] = useState(mine);
+  const [add, setAdd] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setHandle(mine), [mine]);
+
+  const saveMine = async () => {
+    const h = normHandle(handle);
+    if (!validHandle(h)) return toast('Use 2 to 24 letters, digits, dots, dashes or underscores.');
+    if (h === mine) return;
+    setBusy(true);
+    try { await actions.saveProfile(h); toast(`Friends can now add you as @${h}`); } catch (e) { toast(e.message); }
+    setBusy(false);
+  };
+  const addFriend = async (e) => {
+    e.preventDefault();
+    const h = normHandle(add);
+    if (!validHandle(h)) return;
+    if (h === mine) return toast('That is you.');
+    if (friends.some((f) => f.handle === h)) return toast(`@${h} is already a friend.`);
+    setBusy(true);
+    try {
+      const [found] = await actions.findProfile(h);
+      if (!found) toast(`Nobody is @${h} yet. They choose their name here, in Settings, Friends.`, { ms: 6000 });
+      else {
+        actions.saveSettings({ friends: [...friends, { uid: found.uid, handle: h }] });
+        setAdd('');
+        toast(`@${h} added. Type @${h} in a task to share it.`);
+      }
+    } catch (err) { toast(err.message); }
+    setBusy(false);
+  };
+
+  return html`<div class="group group--pad">
+    <${Field} label="Your name" hint="Friends add you with it, and see it on the tasks you share.">
+      <div style="display:flex;gap:8px">
+        <input class="input" value=${handle} placeholder="@yourname" autocapitalize="off" autocomplete="off" spellcheck=${false}
+          onInput=${(e) => setHandle(e.currentTarget.value)} onKeyDown=${(e) => e.key === 'Enter' && saveMine()} />
+        <button class="btn btn--primary btn--sm" disabled=${busy || normHandle(handle) === mine} onClick=${saveMine}>Save</button>
+      </div>
+    </${Field}>
+    ${mine ? html`<form onSubmit=${addFriend} style="margin-top:16px">
+      <${Field} label="Add a friend">
+        <div style="display:flex;gap:8px">
+          <input class="input" value=${add} placeholder="@friend" autocapitalize="off" autocomplete="off" spellcheck=${false} onInput=${(e) => setAdd(e.currentTarget.value)} />
+          <button class="btn btn--sm" type="submit" disabled=${busy || !validHandle(normHandle(add))}>Add</button>
+        </div>
+      </${Field}>
+    </form>` : html`<p class="field__hint" style="margin-top:12px">Choose your name first, then add friends by theirs.</p>`}
+    ${friends.length > 0 && html`<div class="chips" style="margin-top:14px">
+      ${friends.map((f) => html`<span key=${f.uid} class="chip chip--on">@${f.handle}
+        <button type="button" class="link-btn" style="color:inherit;margin-left:4px" aria-label=${`Remove @${f.handle}`}
+          onClick=${() => actions.saveSettings({ friends: friends.filter((x) => x.uid !== f.uid) })}><${Icon} name="x" size="xs" /></button></span>`)}
+    </div>`}
+    <p class="field__hint" style="margin-top:12px">Type @name in a new task, or tap their chip, to share it. You both see it, either of you can tick it off, and they get a notification. A friend needs an account in this app (README, step 10).</p>
   </div>`;
 }
 
@@ -228,6 +294,7 @@ export function SettingsView({ state, sub, install, onSignOut }) {
           </div>
         </${Section}>
         <${Section} title="Notifications" id="notifications"><${Notifications} settings=${s} devices=${state.data.devices} /></${Section}>
+        <${Section} title="Friends" id="friends"><${Friends} settings=${s} profile=${state.data.profile} /></${Section}>
         <${Section} title="App icon"><${AppIcon} settings=${s} /></${Section}>
         <${Section} title="Task areas">
           <div class="group group--pad"><${TagEditor} plain=${true} value=${s.taskAreas || []} onChange=${save('taskAreas')} placeholder="Add an area" /></div>

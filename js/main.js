@@ -99,7 +99,8 @@ function pickEdition(state) {
   const saved = state.data.settings.edition;
   if (saved === 'studio' || saved === 'research') return saved;
   if (!settled(state)) return cachedEdition() || 'wait';
-  return RESEARCH_DATA.some((c) => state.data[c].length) ? 'research' : 'choose';
+  // Tasks a friend shared do not count: a new account can already have some.
+  return RESEARCH_DATA.some((c) => state.data[c].some((x) => !x.shared)) ? 'research' : 'choose';
 }
 
 // Level-ups seen on this device, and freezing finished days into meta/progress.

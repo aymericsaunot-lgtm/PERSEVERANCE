@@ -5,6 +5,7 @@ A personal app that runs on your phone and your computer and stays in sync:
 - **Today**: an almanac front page. The date, sunrise and sunset, the next tide and the swell, a one-line summary of the day, today's tasks, habits, the next eight weeks on one line (beamtimes, deadlines, thesis), reading, surf.
 - **Progress**: a level system fed by what you already log, with a daily XP goal on a dial and four attributes: Work, Mind, Body and Discipline.
 - **Tasks**: quick capture, areas, due dates, stars. Type `#PhD` in a title to set the area, end with `!` to star it.
+- **Shared tasks**: type `@marie` in a task to share it with a friend. You both see it, either of you can tick it off, and the friend gets a notification (step 10).
 - **Papers**: paste a DOI or arXiv ID and the details fill in; To read, Reading, Read; weekly, monthly and yearly counts; tags with real subscripts (MnBi₂Te₄); BibTeX export for the thesis.
 - **arXiv watch**: every weekday morning, new cond-mat papers that match your keywords, one tap to add them to your reading list.
 - **PhD**: beamtime countdowns, proposal and other deadlines, thesis chapters with progress.
@@ -117,20 +118,7 @@ Do this after the new version is on GitHub.
 
 **a. Create her account.** Firebase console, your project, **Authentication**, tab **Users**, **Add user**. Type her email and a temporary password (6 characters or more), then **Add user**. Her line appears in the table; in the **User UID** column, hover her UID and click the copy icon. Paste it somewhere for a minute. Copy yours the same way from your own line.
 
-**b. Let both accounts into the database.** Firebase console, **Firestore Database**, tab **Rules**. The editor shows the rules you published during setup; your UID is already in them. Select everything in the editor, delete it, and paste this, with the two UIDs in place of the capitals:
-
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == uid
-                         && uid in ["YOUR_UID", "HER_UID"];
-    }
-  }
-}
-```
+**b. Let both accounts into the database.** Firebase console, **Firestore Database**, tab **Rules**. The editor shows the rules you published during setup; your UID is already in them. Select everything in the editor, delete it, and paste the content of `firestore.rules`. Near the top, in `allowed()`, put the two UIDs in place of `YOUR_UID` and `HER_UID`, and delete `, "FRIEND_UID"` unless you also have a friend's account (step 10).
 
 Keep the quotes and the comma: `["aB3x9...", "Qp7Lm..."]`. Click **Publish**. If the editor underlines something in red, a quote or the comma is missing. The change applies within a minute.
 
@@ -158,6 +146,7 @@ The app can notify your phone even when it is closed. GitHub sends the notificat
 
 - **Research**: a morning brief (today's tasks, the next deadline or beamtime, the surf), deadlines a week and a day before, beamtimes three days before, new arXiv matches, the surf the evening before a good day, habits left in the evening.
 - **Studio**: a morning brief (tasks, what is due, money to chase), a project due tomorrow or today, an invoice that turns overdue, a quote waiting a week, the end of the fast, habits left in the evening.
+- **Both**: a task a friend just shared with you (step 10).
 
 1. **Give GitHub the sending key.** In your Documents folder, next to the project folder, open `perceverance-notifications-key.txt`. In the GitHub repository, go to **Settings, Secrets and variables, Actions, New repository secret**. Name it `VAPID_PRIVATE_KEY` and paste the 43-character line from the file, nothing else. Then delete the file: anyone with this key can send to your phones. The public half is already in `config.js`. The `FIREBASE_SERVICE_ACCOUNT` secret from step 7 is reused. If you skipped step 7, add that secret now (step 7, points 1 and 2).
 2. **Run it once.** In the **Actions** tab, choose **Notifications**, then **Run workflow**. After about a minute the run turns green. If there is no **Notifications** workflow, the hidden `.github` folder was not uploaded. Choose **Add file, Create new file**, name it `.github/workflows/notify.yml` and paste that file's content.
@@ -184,6 +173,30 @@ Check the rules on your computer, without Firebase:
 pip install tzdata
 python3 scripts/notify.py --self-test
 ```
+
+### 10. Share tasks with friends
+
+A friend needs an account in this app. It can be the Studio account from step 8, or a new one.
+
+**a. Create the account** (skip this for the Studio account). Firebase console, **Authentication**, **Users**, **Add user**, with their email and a temporary password. Copy their **User UID**.
+
+**b. Publish the new rules.** Firebase console, **Firestore Database**, **Rules**. Select everything, delete it, and paste the content of `firestore.rules` from this version. In `allowed()`, near the top, put the UIDs of every account: `["YOUR_UID", "HER_UID", "FRIEND_UID"]`. Delete the ones you do not have, with their comma. Click **Publish**. These rules add two things: the `@names` friends use to find each other, and the shared tasks, which only the people on a task can read.
+
+**c. Choose your names.** Each of you, in **Settings, Friends**: type a name under **Your name** (for example `aymeric`) and **Save**. Then add the other one under **Add a friend** with their name. You only need to add each other once.
+
+**d. Share a task.** In a new task, type `@marie` anywhere in the title (`Book the van @marie`), or tap the `@marie` chip under the task field. The `@marie` part is taken out of the title. To share a task that already exists, open it and tap the friend under **Share with**.
+
+How shared tasks work:
+
+- You both see the task in Tasks and on Today, with "With @name" under the title.
+- Either of you can edit it or tick it off. Only the one who ticks it gets the XP; the other sees "Done by @name".
+- Whoever created the task decides who is on it. Deleting it removes it for everyone. Anyone else can **Leave** it, which only removes it for them.
+- The friend gets a notification within about 10 minutes of the task being shared, if they turned notifications on (step 9). It has its own switch in **Settings, Notifications**.
+
+| What you see | Why | Fix |
+| --- | --- | --- |
+| "Nobody is @name yet" | They have not saved their name | They open Settings, Friends, and save it |
+| "The database refused access" when adding a friend or sharing | The rules from this version are not published, or a UID is missing from `allowed()` | Step b again |
 
 ---
 
@@ -215,7 +228,7 @@ If you add a new file, also add it to the list in `sw.js` so it works offline.
 ```
 index.html            app shell
 config.js             your Firebase keys and the app name
-firestore.rules       database rules (paste into Firebase)
+firestore.rules       database rules (paste into Firebase): your data, friends' names, shared tasks
 sw.js                 offline cache and updates
 manifest.webmanifest  install settings and icons
 icons/                the app icons: three PNG sizes per design, and the browser tab icon

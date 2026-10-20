@@ -142,7 +142,7 @@ export function xpEvents(data, today = todayISO()) {
     if (day && day <= today && xp) out.push({ day, attr, xp, label, kind, at, ...extra });
   };
   for (const t of data.tasks) {
-    if (t.done && t.doneAt) push(dayOf(t.doneAt), 'work', t.starred ? XP.starredTask : XP.task, t.title, 'task', t.doneAt, { area: t.area || '' });
+    if (t.done && t.doneAt && !t.doneByOther) push(dayOf(t.doneAt), 'work', t.starred ? XP.starredTask : XP.task, t.title, 'task', t.doneAt, { area: t.area || '' });
   }
   for (const d of data.deadlines) {
     if (d.done) push(d.doneAt ? dayOf(d.doneAt) : d.date, 'work', XP.deadline, d.title, 'deadline', d.doneAt || 0);

@@ -1,5 +1,7 @@
 // Firebase backend: email and password sign-in, Firestore with offline persistence.
 // Data lives under users/{uid}/... so the security rules can lock it to one account.
+// Shared tasks live in shared/{id}, readable by the accounts in its `members`; they are mixed
+// into the task list, and writes to them are routed there. profiles/{uid} holds each @handle.
 import {
   initializeApp, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence,
   onAuthStateChanged, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
@@ -7,7 +9,7 @@ import {
   collection, doc, query, where, onSnapshot, setDoc, updateDoc, deleteDoc, getDocs,
   writeBatch, arrayUnion, arrayRemove,
 } from '../vendor/firebase.js';
-import { COLLECTIONS, setDocs, setSettingsDoc, setArxivStatus, setMetaDocs, setStatus, resetData, clean } from './store.js';
+import { COLLECTIONS, setDocs, setSettingsDoc, setArxivStatus, setMetaDocs, setProfile, setStatus, resetData, clean } from './store.js';
 import { isoOf, DAY } from './lib/dates.js';
 
 // Backups leave out the devices: a phone's push address belongs to that phone and that account.
@@ -25,6 +27,7 @@ export function createFirebaseBackend(config, { onError }) {
 
   let uid = null;
   let unsubs = [];
+  let shared = new Map(); // shared task id -> its document, for routing writes
   const meta = new Map();
   const report = (err) => {
     console.error(err);
@@ -58,7 +61,11 @@ export function createFirebaseBackend(config, { onError }) {
     unsubs.forEach((u) => u());
     unsubs = [];
     meta.clear();
+    shared = new Map();
   }
+
+  const sharedDoc = (id) => doc(db, 'shared', id);
+  const isShared = (col, id) => col === 'tasks' && shared.has(id);
 
   function start(userId) {
     stop();
@@ -68,9 +75,19 @@ export function createFirebaseBackend(config, { onError }) {
     const sessionCutoff = isoOf(new Date(Date.now() - 365 * DAY));
     let open = [];
     let done = [];
-    const pushTasks = () => setDocs('tasks', [...open, ...done.filter((d) => !open.some((o) => o.id === d.id))]);
-    listen('tasks-open', query(userCol('tasks'), where('done', '==', false)), (docs) => { open = docs; pushTasks(); });
-    listen('tasks-done', query(userCol('tasks'), where('doneAt', '>=', doneCutoff)), (docs) => { done = docs; pushTasks(); });
+    let withFriends = [];
+    let ownSeen = false;
+    const pushTasks = () => setDocs('tasks', [...open, ...done.filter((d) => !open.some((o) => o.id === d.id)), ...withFriends]);
+    listen('tasks-open', query(userCol('tasks'), where('done', '==', false)), (docs) => { open = docs; ownSeen = true; pushTasks(); });
+    listen('tasks-done', query(userCol('tasks'), where('doneAt', '>=', doneCutoff)), (docs) => { done = docs; ownSeen = true; pushTasks(); });
+    // Only the one who ticks a shared task earns its XP: doneByOther keeps it out of the level system.
+    listen('shared', query(collection(db, 'shared'), where('members', 'array-contains', uid)), (docs) => {
+      shared = new Map(docs.map((d) => [d.id, d]));
+      withFriends = docs.filter((d) => !d.done || (d.doneAt || 0) >= doneCutoff)
+        .map((d) => ({ ...d, shared: true, doneByOther: !!d.done && d.doneBy !== uid }));
+      if (ownSeen) pushTasks();
+    });
+    unsubs.push(onSnapshot(doc(db, 'profiles', uid), (snap) => setProfile(snap.exists() ? snap.data() : null), report));
     listen('sessions', query(userCol('sessions'), where('date', '>=', sessionCutoff)), (docs) => setDocs('sessions', docs));
     listen('timelogs', query(userCol('timelogs'), where('date', '>=', sessionCutoff)), (docs) => setDocs('timelogs', docs));
     listen('fasts', query(userCol('fasts'), where('start', '>=', Date.now() - 400 * DAY)), (docs) => setDocs('fasts', docs));
@@ -97,8 +114,33 @@ export function createFirebaseBackend(config, { onError }) {
     start,
     stop,
     set(col, id, data) { setDoc(userDoc(col, id), data).catch(report); },
-    update(col, id, patch) { updateDoc(userDoc(col, id), patch).catch(report); },
-    remove(col, id) { deleteDoc(userDoc(col, id)).catch(report); },
+    update(col, id, patch) {
+      if (!isShared(col, id)) return void updateDoc(userDoc(col, id), patch).catch(report);
+      const p = 'done' in patch ? { ...patch, doneBy: patch.done ? uid : null } : patch;
+      updateDoc(sharedDoc(id), p).catch(report);
+    },
+    // A shared task is deleted for everyone by whoever created it; anyone else leaves it.
+    remove(col, id) {
+      if (!isShared(col, id)) return void deleteDoc(userDoc(col, id)).catch(report);
+      if (shared.get(id).owner === uid) deleteDoc(sharedDoc(id)).catch(report);
+      else updateDoc(sharedDoc(id), { members: arrayRemove(uid) }).catch(report);
+    },
+    // fields: the task; friends: [{uid, handle}]; me: this account's handle.
+    addShared(id, fields, friends, me) {
+      const members = [uid, ...friends.map((f) => f.uid).filter((u) => u !== uid)];
+      const people = { [uid]: me || '', ...Object.fromEntries(friends.map((f) => [f.uid, f.handle])) };
+      setDoc(sharedDoc(id), { ...fields, owner: uid, members, people, sharedAt: Date.now() }).catch(report);
+    },
+    isOwner(id) { return !shared.has(id) || shared.get(id).owner === uid; },
+    async findProfile(handle) {
+      const snap = await getDocs(query(collection(db, 'profiles'), where('handle', '==', handle)));
+      return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+    },
+    async saveProfile(handle) {
+      const taken = (await this.findProfile(handle)).some((p) => p.uid !== uid);
+      if (taken) throw new Error(`@${handle} is already taken.`);
+      await setDoc(doc(db, 'profiles', uid), { handle }, { merge: true });
+    },
     toggleInArray(col, id, field, value, on) {
       updateDoc(userDoc(col, id), { [field]: on ? arrayUnion(value) : arrayRemove(value) }).catch(report);
     },

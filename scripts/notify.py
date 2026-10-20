@@ -8,7 +8,8 @@ about, then sends what is due with Web Push. users/<uid>/server/notified remembe
 went out, so nothing is sent twice.
 
 What is sent, each one can be switched off in Settings > Notifications:
-  both spaces   morning brief, habits left in the evening, a test on request
+  both spaces   morning brief, habits left in the evening, a test on request, a task a
+                friend just shared (shared/<id>, with this account in "members")
   Research      deadlines (a week and a day before), beamtimes (three days before),
                 new arXiv matches, surf the evening before a good or great day
   Studio        projects due tomorrow and today, overdue invoices, quotes waiting a week,
@@ -42,10 +43,11 @@ WINDOW_MIN = 3 * 60          # a late run may still send this long after the cho
 SURF_EVENING = (19 * 60, 22 * 60)
 FAST_STALE_MS = 6 * HOUR_MS  # an old fast nobody closed: stay quiet
 KEEP_LOG_MS = 60 * DAY_MS
+SHARED_FRESH_MS = 2 * DAY_MS  # a shared task older than this is not news any more
 DEFAULT_NOTIFY = {
     "morning": True, "morningAt": "08:00", "evening": True, "eveningAt": "21:00",
     "deadlines": True, "arxiv": True, "surf": True,
-    "projects": True, "invoices": True, "fasting": True, "tz": "",
+    "projects": True, "invoices": True, "fasting": True, "shared": True, "tz": "",
 }
 DEFAULT_SURF = {"name": "Hendaye", "lat": 43.375, "lon": -1.772, "facing": 340}
 SCORE_LABEL = ["Flat or blown out", "Poor", "Fair", "Good", "Great"]
@@ -271,7 +273,7 @@ def plan(now_utc, settings, log, src, forecast=None):
     # Morning: the brief and the date reminders, once a day.
     if log.get("am") != today and in_window(local, morning_at):
         p.log["am"] = today
-        brief = [task_line(today_tasks(src.list("tasks"), today))]
+        brief = [task_line(today_tasks(src.list("tasks") + src.list("shared"), today))]
         if studio:
             projects = [x for x in src.list("projects") if x.get("stage") != "done" and x.get("due")]
             behind = [x for x in projects if x["due"] < today]
@@ -396,6 +398,18 @@ def plan(now_utc, settings, log, src, forecast=None):
                 p.send(f"habits:{today}", f"{plural(len(left), 'habit')} left today", f"{listing(left)}. Still time to tick {'it' if len(left) == 1 else 'them'}.",
                        "./#/life" if not studio else "./#/life", "habits", ttl=3 * 3600)
 
+    # Shared tasks: as soon as a friend shares one with this account.
+    if on("shared"):
+        for t in src.list("shared"):
+            key = f"shared:{t['id']}"
+            if t.get("owner") == src.uid or t.get("done") or seen(key) or now_ms - (t.get("sharedAt") or 0) > SHARED_FRESH_MS:
+                continue
+            handle = (t.get("people") or {}).get(t.get("owner"))
+            gap = days_between(today, t.get("due"))
+            when = "" if gap is None else ", due today" if gap == 0 else ", due tomorrow" if gap == 1 else f", due {short_date(t['due'])}" if gap > 1 else ", already late"
+            p.send(key, f"@{handle} shared a task with you" if handle else "A friend shared a task with you",
+                   f"{t.get('title', 'A task')}{when}.", "./#/tasks", f"shared-{t['id']}")
+
     # Fasting: as soon as the hours are done.
     if studio and on("fasting"):
         for f in src.list("fasts"):
@@ -441,11 +455,24 @@ def vapid_subject():
 class FirestoreSource:
     QUERIES = {"tasks": ("done", "==", False), "invoices": ("status", "==", "sent"), "fasts": ("end", "==", None)}
 
-    def __init__(self, ref):
+    def __init__(self, ref, db=None):
         self.ref = ref
+        self.db = db
+        self.uid = ref.id
         self.cache = {}
 
     def list(self, name):
+        if name == "shared" and name not in self.cache:
+            # Open tasks shared with this account; few enough to filter "done" here.
+            if self.db is None:
+                return []
+            col = self.db.collection("shared")
+            try:
+                from google.cloud.firestore_v1 import FieldFilter
+                col = col.where(filter=FieldFilter("members", "array_contains", self.uid))
+            except ImportError:
+                col = col.where("members", "array_contains", self.uid)
+            self.cache[name] = [{**(s.to_dict() or {}), "id": s.id} for s in col.stream() if not (s.to_dict() or {}).get("done")]
         if name not in self.cache:
             col = self.ref.collection(name)
             if name in self.QUERIES:
@@ -463,7 +490,7 @@ class FirestoreSource:
         return snap.to_dict() if snap.exists else None
 
 
-def run_user(ref, now, key, subject, dry_run, label="account", report=False):
+def run_user(ref, now, key, subject, dry_run, label="account", report=False, db=None):
     from pywebpush import WebPushException, webpush
 
     devices = [{**(s.to_dict() or {}), "id": s.id} for s in ref.collection("devices").stream()]
@@ -472,7 +499,7 @@ def run_user(ref, now, key, subject, dry_run, label="account", report=False):
         print(f"  [{label}] {plural(len(devices), 'device')} with notifications on")
     if not devices:
         return
-    src = FirestoreSource(ref)
+    src = FirestoreSource(ref, db)
     settings = src.doc("meta", "settings") or {}
     log_ref = ref.collection("server").document("notified")
     snap = log_ref.get()
@@ -522,7 +549,7 @@ def run_user(ref, now, key, subject, dry_run, label="account", report=False):
         print(f"  [{label}] nothing delivered; will try again next run", file=sys.stderr)
         return
     # A message that did not go out keeps its slot open, so the next run tries it again.
-    marker = {"test": "test", "arxiv": "arxiv", "surf": "surf", "habits": "pm"}
+    marker = {"test": "test", "arxiv": "arxiv", "surf": "surf", "habits": "pm", "shared": ""}
     plan_log = dict(p.log)
     for k in missed:
         plan_log.pop(marker.get(k.split(":")[0], "am"), None)
@@ -565,7 +592,7 @@ def main():
         print(f"{now:%Y-%m-%d %H:%M} UTC, {plural(len(users), 'account')}", flush=True)
         for n, ref in enumerate(users, 1):
             try:
-                run_user(ref, now, key, subject, args.dry_run, label=f"account {n}", report=first)
+                run_user(ref, now, key, subject, args.dry_run, label=f"account {n}", report=first, db=db)
             except Exception as e:  # one account must not stop the others; no message text in a public log
                 print(f"::warning::account {n}: {type(e).__name__}" + (f": {e}" if args.dry_run else ""))
         if not args.dry_run:
@@ -609,8 +636,8 @@ def arxiv_daily(db, now, state):
 # ---------------------------------------------------------------- self-test
 
 class FakeSource:
-    def __init__(self, lists, docs=None):
-        self.lists, self.docs = lists, docs or {}
+    def __init__(self, lists, docs=None, uid="me"):
+        self.lists, self.docs, self.uid = lists, docs or {}, uid
 
     def list(self, name):
         return self.lists.get(name, [])
@@ -728,6 +755,24 @@ def self_test():
     old = merge_log({"overdue:x:2026-01-01": 1, "am": "2026-10-10"}, {}, [], ms("2026-10-11T08:00"))
     check("overdue:x:2026-01-01" not in old and old["am"] == "2026-10-10", old)
     check(money(1200, "EUR") == "€1,200" and money(99.5, "CHF") == "CHF 99.50", money(99.5, "CHF"))
+    # Shared tasks: the friend hears about a new one once; the one who shared it does not.
+    t0 = ms("2026-10-11T10:00")
+    shared = [{"id": "s1", "title": "Book the van", "owner": "me", "members": ["me", "fr"], "people": {"me": "aymeric", "fr": "marie"},
+               "sharedAt": t0, "due": "2026-10-12", "done": False},
+              {"id": "s2", "title": "Old one", "owner": "me", "members": ["me", "fr"], "people": {"me": "aymeric"}, "sharedAt": t0 - 3 * DAY_MS, "done": False}]
+    quiet = {"notify": {"tz": "Europe/Paris", "morning": False, "evening": False}}
+    p = plan(at("2026-10-11T10:05"), quiet, {}, FakeSource({"shared": shared}, uid="fr"))
+    check([m["key"] for m in p.messages] == ["shared:s1"], p.messages)
+    check(p.messages[0]["title"] == "@aymeric shared a task with you" and p.messages[0]["body"] == "Book the van, due tomorrow.", p.messages[0])
+    log = merge_log({}, p.log, ["shared:s1"], t0)
+    check(plan(at("2026-10-11T10:15"), quiet, log, FakeSource({"shared": shared}, uid="fr")).messages == [], "shared sent once")
+    check(plan(at("2026-10-11T10:05"), quiet, {}, FakeSource({"shared": shared}, uid="me")).messages == [], "not to the one who shared it")
+    off = {"notify": {**quiet["notify"], "shared": False}}
+    check(plan(at("2026-10-11T10:05"), off, {}, FakeSource({"shared": shared}, uid="fr")).messages == [], "switched off")
+    p = plan(at("2026-10-12T08:01"), {"notify": {"tz": "Europe/Paris"}}, {}, FakeSource({"shared": shared}, uid="fr"))
+    brief = next(m["body"] for m in p.messages if m["key"].startswith("brief"))
+    check("Book the van" in brief, f"shared tasks in the brief: {brief}")
+
     print(f"self-test passed: {checks} checks")
 
 

@@ -1,15 +1,45 @@
 rules_version = '2';
 
-// Only the accounts listed below can use the app, and each one can only read or write
-// its own data under users/{uid}. Nobody can see anyone else's data.
-// Replace YOUR_UID with your User UID and HER_UID with the designer's, both from
-// Firebase, Authentication, Users. To allow only yourself, delete , "HER_UID".
+// Only the accounts listed in allowed() can use the app. Each one can only read or write its
+// own data under users/{uid}; nobody can see anyone else's data. Two things are shared:
+//   profiles/{uid}  each account's @handle, so friends can find each other
+//   shared/{id}     a task shared between friends, readable only by the accounts in "members"
+// Replace YOUR_UID, HER_UID and FRIEND_UID with User UIDs from Firebase, Authentication, Users.
+// Add or delete UIDs in the list to match the accounts you have, for example
+// ["YOUR_UID"] for yourself alone.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function allowed() {
+      return request.auth != null
+          && request.auth.uid in ["YOUR_UID", "HER_UID", "FRIEND_UID"];
+    }
+
     match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == uid
-                         && uid in ["YOUR_UID", "HER_UID"];
+      allow read, write: if allowed() && request.auth.uid == uid;
+    }
+
+    match /profiles/{uid} {
+      allow read: if allowed();
+      allow write: if allowed() && request.auth.uid == uid;
+    }
+
+    // Whoever creates a shared task owns it: only they choose who is on it, or delete it.
+    // Every member can edit and tick it, and leave it by taking themselves off "members".
+    match /shared/{id} {
+      allow read: if allowed() && request.auth.uid in resource.data.members;
+      allow create: if allowed()
+                    && request.resource.data.owner == request.auth.uid
+                    && request.auth.uid in request.resource.data.members
+                    && request.resource.data.members.size() <= 10;
+      allow update: if allowed() && request.auth.uid in resource.data.members && (
+           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['owner', 'members', 'people'])
+        || (resource.data.owner == request.auth.uid
+            && request.resource.data.owner == request.auth.uid
+            && request.auth.uid in request.resource.data.members
+            && request.resource.data.members.size() <= 10)
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
+            && request.resource.data.members.toSet() == resource.data.members.toSet().difference([request.auth.uid].toSet())));
+      allow delete: if allowed() && resource.data.owner == request.auth.uid;
     }
   }
 }

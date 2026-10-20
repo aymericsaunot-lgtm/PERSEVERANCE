@@ -49,12 +49,22 @@ export function createFirebaseBackend(config, { onError }) {
   const userCol = (name) => collection(db, 'users', uid, name);
   const userDoc = (name, id) => doc(db, 'users', uid, name, id);
 
-  function listen(key, q, apply) {
+  // Until the rules from README step 10 are published, shared tasks and profiles are refused:
+  // the app then simply works without them instead of showing an error.
+  const quiet = (key) => (err) => {
+    if (err && err.code === 'permission-denied') {
+      console.warn(`${key}: not allowed by the Firestore rules yet (README, step 10)`);
+      meta.delete(key);
+      updateSync();
+    } else report(err);
+  };
+
+  function listen(key, q, apply, onFail = report) {
     unsubs.push(onSnapshot(q, { includeMetadataChanges: true }, (snap) => {
       meta.set(key, { pending: snap.metadata.hasPendingWrites, cache: snap.metadata.fromCache });
       apply(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       updateSync();
-    }, report));
+    }, onFail));
   }
 
   function stop() {
@@ -86,8 +96,8 @@ export function createFirebaseBackend(config, { onError }) {
       withFriends = docs.filter((d) => !d.done || (d.doneAt || 0) >= doneCutoff)
         .map((d) => ({ ...d, shared: true, doneByOther: !!d.done && d.doneBy !== uid }));
       if (ownSeen) pushTasks();
-    });
-    unsubs.push(onSnapshot(doc(db, 'profiles', uid), (snap) => setProfile(snap.exists() ? snap.data() : null), report));
+    }, quiet('shared'));
+    unsubs.push(onSnapshot(doc(db, 'profiles', uid), (snap) => setProfile(snap.exists() ? snap.data() : null), quiet('profile')));
     listen('sessions', query(userCol('sessions'), where('date', '>=', sessionCutoff)), (docs) => setDocs('sessions', docs));
     listen('timelogs', query(userCol('timelogs'), where('date', '>=', sessionCutoff)), (docs) => setDocs('timelogs', docs));
     listen('fasts', query(userCol('fasts'), where('start', '>=', Date.now() - 400 * DAY)), (docs) => setDocs('fasts', docs));
